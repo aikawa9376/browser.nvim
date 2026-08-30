@@ -6,7 +6,7 @@ pixels never pass through Lua.
 
 > [!IMPORTANT]
 > The implementation covers Phases 1–7: browser-buffer lifecycle, real CEF
-> rendering, a persistent DOM cursor in Browser Normal Mode, link hints,
+> rendering, a persistent spatial cursor in Browser Normal Mode, link hints,
 > Browser Insert Mode, DOM visual selection, popup composition, and
 > dirty-rectangle frame updates. Mouse input is intentionally outside the MVP.
 
@@ -116,11 +116,11 @@ The default Browser Normal Mode mappings are:
 
 | Key | Action |
 | --- | --- |
-| `h` / `l` | Move the DOM cursor by Unicode grapheme |
-| `b` / `w` | Move the DOM cursor by word |
-| `j` / `k` | Move to the previous / next visual line |
-| `0` / `$` | Move to the visual line start / end |
-| `<CR>` | Activate the link or button under the DOM cursor |
+| `h` / `l` | Move the spatial cursor left / right by one terminal cell |
+| `b` / `w` | Jump the spatial cursor by DOM word |
+| `j` / `k` | Move the spatial cursor down / up by one terminal cell |
+| `0` / `$` | Move to the left / right edge of the viewport row |
+| `<CR>` | Activate the link or button under the spatial cursor |
 | `<C-d>` / `<C-u>` | Scroll half a viewport |
 | `<C-f>` / `<C-b>` | Scroll one viewport |
 | `gg` / `G` | Top / bottom |
@@ -128,17 +128,17 @@ The default Browser Normal Mode mappings are:
 | `r` | Reload |
 | `o` | Edit the current URL and navigate |
 | `f` | Start link hints |
-| `v` | Start Browser Visual Mode at the DOM cursor |
-| `i` | Enter Insert Mode when the DOM cursor is on an editable element |
+| `v` | Start Browser Visual Mode near the spatial cursor |
+| `i` | Enter Insert Mode when the spatial cursor overlaps an editable element |
 | `yy` | Yank the current URL |
 
-Browser Normal Mode keeps a block cursor on rendered page text. Editable form
-elements are cursor stops and use a yellow outline instead of a text block;
-links and buttons use a cyan outline. Text uses a solid yellow overlay rather
-than terminal blending so the cursor remains visible on light and dark pages.
-`i` focuses that element and enters both Browser and Neovim Insert Mode. Cursor
-motion scrolls when necessary, and page scrolling relocates an off-screen
-cursor to visible content. `<C-w>` mappings are not overridden, so normal
+Browser Normal Mode keeps a terminal-cell-sized spatial cursor over the browser
+surface, including completely empty page areas. It uses a solid yellow overlay
+on ordinary content and a cyan outline when its cell overlaps a link or button,
+so it remains visible on light and dark pages. `h/j/k/l` always move exactly one
+cell; crossing a viewport edge scrolls the page by one cell. `w/b` remain
+semantic DOM word jumps. When the cell overlaps an editable element, `i`
+focuses it and enters both Browser and Neovim Insert Mode. `<C-w>` mappings are not overridden, so normal
 Neovim window movement remains available. Link hints use labels generated from
 `asdfghjkl`. Choosing an `input`, `textarea`, or `select` focuses it and enters
 Browser Insert Mode.
@@ -150,7 +150,8 @@ The `o` prompt is intentionally prefilled with the current page URL, making it
 possible to edit only its path or query. Use `<CR>` instead when the cursor is
 already on a link or button in the page.
 
-Browser Visual Mode starts at the Normal Mode cursor and uses a DOM `Range` for
+Browser Visual Mode starts at the nearest rendered text position to the Normal
+Mode spatial cursor and uses a DOM `Range` for
 the actual page selection while also entering Neovim's native characterwise
 Visual mode. This keeps the editor mode indicator and Visual keymap context in
 sync. The same text motions remain active:

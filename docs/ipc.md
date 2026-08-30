@@ -65,9 +65,12 @@ The daemon responds with `mode_changed`, `hints_ready`, `hint_activated`,
 `hints_cancelled`, or `hints_empty`. A focused form target changes the mode to
 `insert`; a clicked target returns it to `normal`.
 
-Browser Normal Mode exposes a persistent DOM text cursor. `cursor_move` accepts
-the same movement operations as Visual Mode except `swap`, and
-`visual_cursor_start` begins a one-grapheme selection at its current position:
+Browser Normal Mode exposes a persistent terminal-cell-sized spatial cursor.
+For Normal Mode, `previous_grapheme`, `next_grapheme`, `up`, and `down` move one
+cell even across empty page areas; the operation names remain stable for IPC
+compatibility. Word operations jump to DOM words, while line-edge operations
+move to viewport edges. `visual_cursor_start` begins a one-grapheme selection
+at the nearest rendered text position:
 
 ```json
 {"type":"cursor_move","browser_id":1,"operation":"next_word"}
@@ -76,8 +79,7 @@ the same movement operations as Visual Mode except `swap`, and
 ```
 
 `cursor_activate` clicks the actionable ancestor under the cursor. Text links
-and buttons are activated from their text position; controls without rendered
-text are represented as atomic cursor stops. If no actionable target exists,
+and buttons are activated when they overlap the spatial cell. If no actionable target exists,
 the daemon emits `cursor_activate_unavailable`.
 
 DOM Visual Mode then uses `visual_move`, `visual_yank`, and `visual_cancel`.

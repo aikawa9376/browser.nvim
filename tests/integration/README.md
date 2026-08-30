@@ -35,7 +35,8 @@ or `all` before starting Neovim.
     use editing keys, and return to both Browser and Neovim Normal Mode with
     `Esc`. Repeat once by selecting the input through `f` hints.
 12. On `selection.html`, verify that a block cursor is always visible. Move it
-    with `h/l/w/b/j/k/0/$`, press `v`, and verify Neovim's mode indicator also
+    through both text and empty space with `h/l/j/k`, use `w/b` for words,
+    press `v`, and verify Neovim's mode indicator also
     changes to Visual. Extend or
     reverse the selection with `h/l/w/b/j/k/0/$/o`, and press `y`. Verify the
     result with `:registers`.

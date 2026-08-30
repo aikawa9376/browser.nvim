@@ -244,6 +244,16 @@ bool CefBrowserManager::Resize(const JsonValue& message, std::string* error) {
   if (state->browser && pixels_changed) {
     state->browser->GetHost()->WasResized();
   }
+  if (state->browser) {
+    ExecuteScript(
+        state,
+        "window.__nvimBrowser&&window.__nvimBrowser.visual&&"
+        "window.__nvimBrowser.visual.setGrid(" +
+            std::to_string(static_cast<double>(state->width) / state->columns) +
+            "," +
+            std::to_string(static_cast<double>(state->height) / state->rows) +
+            ");");
+  }
   if (state->attached && cells_changed && state->framebuffer.has_view()) {
     return renderer_->PlaceRelative(
         state->browser_image_id, state->browser_placement_id,
@@ -1337,6 +1347,14 @@ void CefBrowserManager::OnLoadingStateChange(std::uint32_t browser_id,
     for (std::string& script : scripts) {
       ExecuteScript(state, std::move(script));
     }
+    ExecuteScript(
+        state,
+        "window.__nvimBrowser&&window.__nvimBrowser.visual&&"
+        "window.__nvimBrowser.visual.setGrid(" +
+            std::to_string(static_cast<double>(state->width) / state->columns) +
+            "," +
+            std::to_string(static_cast<double>(state->height) / state->rows) +
+            ");");
     if (state->mode == "normal") {
       ExecuteScript(
           state,

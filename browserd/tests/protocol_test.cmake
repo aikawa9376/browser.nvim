@@ -25,3 +25,14 @@ string(FIND "${output}" "\"type\":\"error\"" error_event)
 if(NOT error_event EQUAL -1)
   message(FATAL_ERROR "unexpected protocol error: ${output}")
 endif()
+
+execute_process(
+  COMMAND "${BROWSERD}" --version
+  OUTPUT_VARIABLE version_output
+  ERROR_VARIABLE version_error
+  RESULT_VARIABLE version_result
+)
+if(NOT version_result EQUAL 0 OR NOT version_output MATCHES "protocol=2")
+  message(FATAL_ERROR
+    "browserd did not report protocol=2 (${version_result}): ${version_output}${version_error}")
+endif()

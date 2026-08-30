@@ -98,7 +98,7 @@ assert_equal(sent[#sent].operation, "previous_grapheme", "h cursor movement")
 
 state.ready = true
 feed("<CR>")
-assert_equal(sent[#sent].type, "cursor_activate", "enter must activate the DOM cursor target")
+assert_equal(sent[#sent].type, "cursor_activate", "enter must activate the spatial cursor target")
 
 feed("v")
 assert_equal(sent[#sent].type, "visual_cursor_start", "v must select from the normal cursor")
@@ -121,7 +121,7 @@ feed("L")
 assert_equal(sent[#sent].type, "forward", "L navigation")
 
 feed("i")
-assert_equal(sent[#sent].type, "input_cursor_start", "i must request insert mode at the DOM cursor")
+assert_equal(sent[#sent].type, "input_cursor_start", "i must request insert mode at the spatial cursor")
 
 state.mode = "insert"
 local mappings = require("browser.mappings")

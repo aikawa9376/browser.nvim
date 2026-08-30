@@ -53,10 +53,18 @@ function M.check()
     vim.health.ok("browserd: " .. executable)
     local version_result = vim.system({ executable, "--version" }, { text = true }):wait(3000)
     local version = vim.trim(version_result.stdout or "")
-    if version_result.code == 0 and version:find("cef=", 1, true) then
+    if version_result.code == 0
+      and version:find("protocol=2", 1, true)
+      and version:find("cef=", 1, true)
+    then
       vim.health.ok(version)
-    elseif version_result.code == 0 and version:find("phase1-gradient", 1, true) then
+    elseif version_result.code == 0
+      and version:find("protocol=2", 1, true)
+      and version:find("phase1-gradient", 1, true)
+    then
       vim.health.error("browserd was built without CEF; rebuild after running scripts/fetch-cef.sh")
+    elseif version_result.code == 0 then
+      vim.health.error("browserd is out of date; rebuild it with cmake: " .. executable)
     else
       vim.health.error("browserd could not report its CEF version")
     end

@@ -305,10 +305,11 @@ wait_for_event 'cursor page title' '"type":"title_changed"' '"title":"browser.nv
 wait_for_event 'cursor page completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$cursor_page\""
 reset_events
 
-printf '%s\n' \
-  '{"type":"cursor_move","browser_id":1,"operation":"down"}' \
-  '{"type":"visual_cursor_start","browser_id":1}' \
-  >&"$daemon_input"
+for ((step = 0; step < 50; step += 1)); do
+  printf '%s\n' '{"type":"cursor_move","browser_id":1,"operation":"down"}' \
+    >&"$daemon_input"
+done
+printf '%s\n' '{"type":"visual_cursor_start","browser_id":1}' >&"$daemon_input"
 wait_for_event 'visual mode after crossing blank space' '"type":"mode_changed"' '"mode":"visual"'
 printf '%s\n' '{"type":"visual_yank","browser_id":1}' >&"$daemon_input"
 wait_for_event 'stable cursor movement across blank space' '"type":"visual_yank"' '"text":"B"'

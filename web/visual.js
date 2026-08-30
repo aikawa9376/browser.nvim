@@ -9,7 +9,8 @@
   const alphabet = "asdfghjkl";
   let hintSession = null;
   let selectionState = null;
-  let cursorState = null;
+  let cursorState = { x: 0, y: 0 };
+  let cursorGrid = { width: 10, height: 20 };
   let cursorMarker = null;
   let normalMode = false;
   let cursorRefreshPending = false;
@@ -65,47 +66,6 @@
       "text", "search", "email", "url", "tel", "password", "number",
       "date", "time", "datetime-local", "month", "week",
     ].includes(element.type);
-  };
-
-  const editableElements = (visibleOnly = false) =>
-    Array.from(document.querySelectorAll("input,textarea,select,[contenteditable]"))
-      .filter((element) => {
-        if (!isEditableElement(element)) {
-          return false;
-        }
-        const style = getComputedStyle(element);
-        if (style.display === "none" || style.visibility === "hidden" ||
-            Number.parseFloat(style.opacity) === 0) {
-          return false;
-        }
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 &&
-          (!visibleOnly || visibleRectangle(rect));
-      });
-
-  const actionableElements = (visibleOnly = false) =>
-    Array.from(document.querySelectorAll(
-      "a[href],button,summary,[role='button'],[role='link']," +
-      "input[type='button'],input[type='submit'],input[type='reset']",
-    )).filter((element) => {
-      if (!(element instanceof HTMLElement) || element.matches(":disabled")) {
-        return false;
-      }
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== "none" && style.visibility !== "hidden" &&
-        Number.parseFloat(style.opacity) !== 0 && rect.width > 0 && rect.height > 0 &&
-        (!visibleOnly || visibleRectangle(rect));
-    });
-
-  const hasCursorText = (element) => {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (!excludedParent(node) && node.data.trim() && nodeRectangles(node).length > 0) {
-        return true;
-      }
-    }
-    return false;
   };
 
   const positionOrder = (left, right) => {
@@ -295,61 +255,56 @@
     return positions;
   };
 
-  const normalPositions = (wordsOnly = false, visibleOnly = false) => {
-    const positions = [];
-    for (const node of selectableNodes(visibleOnly)) {
-      const offsets = wordsOnly
-        ? wordSegments(node.data).map((segment) => segment.start)
-        : graphemeBoundaries(node.data);
-      for (const offset of offsets) {
-        const position = { node, offset };
-        const rect = caretRectangle(position);
-        if (!visibleOnly || (rect.height > 0 && rect.bottom >= -2 &&
-            rect.top <= innerHeight + 2)) {
-          positions.push({ position, rect });
-        }
-        if (positions.length >= 6000) {
-          break;
-        }
-      }
-      if (positions.length >= 6000) {
-        break;
-      }
-    }
-    const elements = new Set();
-    for (const element of editableElements(visibleOnly)) {
-      if (!hasCursorText(element)) {
-        elements.add(element);
-        const position = { node: element, offset: 0, element: true, editable: true };
-        positions.push({ position, rect: element.getBoundingClientRect() });
-      }
-    }
-    for (const element of actionableElements(visibleOnly)) {
-      if (!elements.has(element) && !hasCursorText(element)) {
-        const position = { node: element, offset: 0, element: true, actionable: true };
-        positions.push({ position, rect: element.getBoundingClientRect() });
-      }
-    }
-    positions.sort((left, right) => positionOrder(left.position, right.position));
-    return positions;
+  const cursorRectangle = () => ({
+    left: cursorState.x,
+    right: cursorState.x + cursorGrid.width,
+    top: cursorState.y,
+    bottom: cursorState.y + cursorGrid.height,
+    width: cursorGrid.width,
+    height: cursorGrid.height,
+  });
+
+  const clampCursor = () => {
+    const maximumX = Math.max(0,
+      Math.floor((innerWidth - cursorGrid.width) / cursorGrid.width) * cursorGrid.width);
+    const maximumY = Math.max(0,
+      Math.floor((innerHeight - cursorGrid.height) / cursorGrid.height) * cursorGrid.height);
+    cursorState.x = Math.max(0, Math.min(maximumX, cursorState.x));
+    cursorState.y = Math.max(0, Math.min(maximumY, cursorState.y));
   };
 
-  const cursorRectangle = (position) => {
-    if (position.element) {
-      return position.node.getBoundingClientRect();
-    }
-    const next = nextGrapheme(position, 1);
-    if (next.node === position.node && next.offset > position.offset) {
-      const range = document.createRange();
-      range.setStart(position.node, position.offset);
-      range.setEnd(next.node, next.offset);
-      const rect = Array.from(range.getClientRects()).find(visibleRectangle) ||
-        range.getBoundingClientRect();
-      if (rect.height > 0) {
-        return rect;
+  const elementsInCursor = () => {
+    const rect = cursorRectangle();
+    const insetX = Math.min(2, rect.width / 4);
+    const insetY = Math.min(2, rect.height / 4);
+    const points = [
+      [rect.left + rect.width / 2, rect.top + rect.height / 2],
+      [rect.left + insetX, rect.top + rect.height / 2],
+      [rect.right - insetX, rect.top + rect.height / 2],
+      [rect.left + rect.width / 2, rect.top + insetY],
+      [rect.left + rect.width / 2, rect.bottom - insetY],
+    ];
+    const elements = [];
+    const seen = new Set();
+    for (const [x, y] of points) {
+      for (const element of document.elementsFromPoint(x, y)) {
+        if (!seen.has(element)) {
+          seen.add(element);
+          elements.push(element);
+        }
       }
     }
-    return caretRectangle(position);
+    return elements;
+  };
+
+  const closestCursorElement = (selector, predicate = () => true) => {
+    for (const hit of elementsInCursor()) {
+      const element = hit.closest?.(selector);
+      if (element && predicate(element)) {
+        return element;
+      }
+    }
+    return null;
   };
 
   const ensureCursorMarker = () => {
@@ -371,73 +326,46 @@
     return cursorMarker;
   };
 
-  const initialCursorPosition = () => {
-    const candidates = normalPositions(false, true).filter(({ rect }) =>
-      rect.height > 0 && rect.bottom > 0 && rect.right >= 0 &&
-      rect.top < innerHeight && rect.left < innerWidth);
-    candidates.sort((left, right) =>
-      left.rect.top - right.rect.top || left.rect.left - right.rect.left);
-    return candidates[0]?.position || null;
-  };
-
-  const renderCursor = (rehome = true) => {
+  const renderCursor = () => {
     if (!normalMode) {
       if (cursorMarker) {
         cursorMarker.style.display = "none";
       }
       return;
     }
-    if (!cursorState || !cursorState.focus.node.isConnected) {
-      const position = initialCursorPosition();
-      cursorState = position ? { focus: position, preferredX: null } : null;
-    }
-    if (!cursorState) {
-      return;
-    }
-    let rect = cursorRectangle(cursorState.focus);
-    if (!visibleRectangle(rect)) {
-      if (!rehome) {
-        if (cursorMarker) {
-          cursorMarker.style.display = "none";
-        }
-        return;
-      }
-      const position = initialCursorPosition();
-      if (!position) {
-        return;
-      }
-      cursorState = { focus: position, preferredX: null };
-      rect = cursorRectangle(position);
-    }
+    clampCursor();
+    const rect = cursorRectangle();
     const marker = ensureCursorMarker();
-    const editable = Boolean(cursorState.focus.editable);
-    const actionable = Boolean(cursorState.focus.actionable);
-    const element = editable || actionable;
+    const editable = closestCursorElement(
+      "input,textarea,select,[contenteditable]", isEditableElement);
+    const actionable = closestCursorElement(
+      "a[href],button,summary,[role='button'],[role='link']," +
+      "input[type='button'],input[type='submit'],input[type='reset']",
+      (element) => !element.matches(":disabled"),
+    );
     const color = actionable ? "#22d3ee" : "#facc15";
     Object.assign(marker.style, {
       display: "block",
       left: `${Math.max(0, rect.left)}px`,
       top: `${Math.max(0, rect.top)}px`,
-      width: `${Math.max(element ? 4 : 2, rect.width)}px`,
+      width: `${rect.width}px`,
       height: `${Math.max(2, rect.height)}px`,
-      background: element ? `${color}33` : "rgba(250,204,21,.58)",
+      background: editable || actionable ? `${color}33` : "rgba(250,204,21,.58)",
       outline: `2px solid ${color}`,
-      outlineOffset: element ? "-2px" : "-1px",
+      outlineOffset: editable || actionable ? "-2px" : "-1px",
     });
   };
 
-  const revealCursor = () => {
-    if (!cursorState) {
+  const setGrid = (width, height) => {
+    if (!Number.isFinite(width) || !Number.isFinite(height) ||
+        width <= 0 || height <= 0) {
       return;
     }
-    let rect = cursorRectangle(cursorState.focus);
-    if (rect.top < 8) {
-      scrollBy(0, rect.top - 12);
-    } else if (rect.bottom > innerHeight - 8) {
-      scrollBy(0, rect.bottom - innerHeight + 12);
-    }
-    rect = cursorRectangle(cursorState.focus);
-    renderCursor(false);
+    const column = Math.round(cursorState.x / cursorGrid.width);
+    const row = Math.round(cursorState.y / cursorGrid.height);
+    cursorGrid = { width, height };
+    cursorState = { x: column * width, y: row * height };
+    renderCursor();
   };
 
   const scheduleCursorRefresh = () => {
@@ -576,73 +504,128 @@
     }
   };
 
+  const wordCursorPositions = () => {
+    const positions = [];
+    for (const node of selectableNodes(false)) {
+      for (const segment of wordSegments(node.data)) {
+        const position = { node, offset: segment.start };
+        const rect = caretRectangle(position);
+        positions.push({
+          position,
+          documentX: rect.left + scrollX,
+          documentY: rect.top + scrollY,
+        });
+      }
+    }
+    for (const element of document.querySelectorAll(
+      "input,textarea,select,[contenteditable],a[href],button,summary," +
+      "[role='button'],[role='link']",
+    )) {
+      if (!(element instanceof HTMLElement) || element.matches(":disabled") ||
+          element.textContent.trim()) {
+        continue;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        positions.push({
+          element,
+          documentX: rect.left + scrollX,
+          documentY: rect.top + scrollY,
+        });
+      }
+    }
+    positions.sort((left, right) =>
+      left.documentY - right.documentY || left.documentX - right.documentX);
+    return positions;
+  };
+
+  const placeCursorAtTarget = (target) => {
+    let rect = target.element
+      ? target.element.getBoundingClientRect()
+      : caretRectangle(target.position);
+    if (rect.top < 0 || rect.bottom > innerHeight) {
+      scrollBy(0, rect.top - Math.max(cursorGrid.height, innerHeight / 2));
+      rect = target.element
+        ? target.element.getBoundingClientRect()
+        : caretRectangle(target.position);
+    }
+    if (rect.left < 0 || rect.right > innerWidth) {
+      scrollBy(rect.left - Math.max(cursorGrid.width, innerWidth / 2), 0);
+      rect = target.element
+        ? target.element.getBoundingClientRect()
+        : caretRectangle(target.position);
+    }
+    cursorState.x = Math.floor(Math.max(0, rect.left) / cursorGrid.width) *
+      cursorGrid.width;
+    cursorState.y = Math.floor(Math.max(0, rect.top) / cursorGrid.height) *
+      cursorGrid.height;
+    renderCursor();
+  };
+
+  const moveByCell = (dx, dy) => {
+    const maximumX = Math.max(0,
+      Math.floor((innerWidth - cursorGrid.width) / cursorGrid.width) * cursorGrid.width);
+    const maximumY = Math.max(0,
+      Math.floor((innerHeight - cursorGrid.height) / cursorGrid.height) * cursorGrid.height);
+    const nextX = cursorState.x + dx * cursorGrid.width;
+    const nextY = cursorState.y + dy * cursorGrid.height;
+    if (nextX < 0) {
+      scrollBy(-cursorGrid.width, 0);
+    } else if (nextX > maximumX) {
+      scrollBy(cursorGrid.width, 0);
+    } else {
+      cursorState.x = nextX;
+    }
+    if (nextY < 0) {
+      scrollBy(0, -cursorGrid.height);
+    } else if (nextY > maximumY) {
+      scrollBy(0, cursorGrid.height);
+    } else {
+      cursorState.y = nextY;
+    }
+    renderCursor();
+  };
+
   const normalMove = (operation) => {
     if (!normalMode) {
       return;
     }
-    renderCursor();
-    if (!cursorState) {
-      return;
-    }
-    if (operation === "previous_grapheme" || operation === "next_grapheme" ||
-        operation === "previous_word" || operation === "next_word") {
-      const direction = operation.startsWith("next_") ? 1 : -1;
-      const candidates = normalPositions(operation.endsWith("word"), false);
+    if (operation === "previous_grapheme") {
+      moveByCell(-1, 0);
+    } else if (operation === "next_grapheme") {
+      moveByCell(1, 0);
+    } else if (operation === "down") {
+      moveByCell(0, 1);
+    } else if (operation === "up") {
+      moveByCell(0, -1);
+    } else if (operation === "previous_word" || operation === "next_word") {
+      const pointX = cursorState.x + cursorGrid.width / 2 + scrollX;
+      const pointY = cursorState.y + cursorGrid.height / 2 + scrollY;
+      const positions = wordCursorPositions();
       let target = null;
-      if (direction > 0) {
-        target = candidates.find(({ position }) =>
-          positionOrder(position, cursorState.focus) > 0)?.position || null;
+      if (operation === "next_word") {
+        target = positions.find((candidate) =>
+          candidate.documentY > pointY + cursorGrid.height / 2 ||
+          (Math.abs(candidate.documentY - pointY) <= cursorGrid.height / 2 &&
+            candidate.documentX > pointX + cursorGrid.width / 2)) || null;
       } else {
-        for (let index = candidates.length - 1; index >= 0; index -= 1) {
-          if (positionOrder(candidates[index].position, cursorState.focus) < 0) {
-            target = candidates[index].position;
+        for (let index = positions.length - 1; index >= 0; index -= 1) {
+          const candidate = positions[index];
+          if (candidate.documentY < pointY - cursorGrid.height / 2 ||
+              (Math.abs(candidate.documentY - pointY) <= cursorGrid.height / 2 &&
+                candidate.documentX < pointX - cursorGrid.width / 2)) {
+            target = candidate;
             break;
           }
         }
       }
       if (target) {
-        cursorState.focus = target;
-        cursorState.preferredX = null;
-        revealCursor();
-      }
-    } else if (operation === "down" || operation === "up") {
-      const direction = operation === "down" ? 1 : -1;
-      const current = caretRectangle(cursorState.focus);
-      if (cursorState.preferredX === null) {
-        cursorState.preferredX = current.left;
-      }
-      const currentCenter = current.top + current.height / 2;
-      const candidates = normalPositions(false, false).filter(({ position, rect }) => {
-        if (positionOrder(position, cursorState.focus) === 0) {
-          return false;
-        }
-        const center = rect.top + rect.height / 2;
-        return direction > 0 ? center > currentCenter + 1 : center < currentCenter - 1;
-      });
-      let lineDistance = Infinity;
-      for (const candidate of candidates) {
-        lineDistance = Math.min(lineDistance, Math.abs(
-          candidate.rect.top + candidate.rect.height / 2 - currentCenter,
-        ));
-      }
-      const tolerance = Math.max(2, current.height * 0.6);
-      const nextLine = candidates.filter(({ rect }) => Math.abs(
-        Math.abs(rect.top + rect.height / 2 - currentCenter) - lineDistance,
-      ) <= tolerance);
-      nextLine.sort((left, right) =>
-        Math.abs(left.rect.left - cursorState.preferredX) -
-        Math.abs(right.rect.left - cursorState.preferredX));
-      if (nextLine[0]) {
-        cursorState.focus = nextLine[0].position;
-        revealCursor();
+        placeCursorAtTarget(target);
       }
     } else if (operation === "line_start" || operation === "line_end") {
-      lineEdge(
-        cursorState,
-        operation === "line_end",
-        revealCursor,
-        () => normalPositions(false, false),
-      );
+      cursorState.x = operation === "line_start" ? 0 : Number.MAX_SAFE_INTEGER;
+      clampCursor();
+      renderCursor();
     }
   };
 
@@ -753,15 +736,23 @@
   };
 
   const startAtCursor = () => {
-    if (!cursorState || !cursorState.focus.node.isConnected) {
-      const position = initialCursorPosition();
-      cursorState = position ? { focus: position, preferredX: null } : null;
-    }
-    if (!cursorState || cursorState.focus.element) {
+    const rect = cursorRectangle();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const candidates = renderedPositions();
+    candidates.sort((left, right) => {
+      const leftX = left.rect.left;
+      const leftY = left.rect.top + left.rect.height / 2;
+      const rightX = right.rect.left;
+      const rightY = right.rect.top + right.rect.height / 2;
+      return Math.hypot(leftX - centerX, leftY - centerY) -
+        Math.hypot(rightX - centerX, rightY - centerY);
+    });
+    const anchor = candidates[0]?.position || null;
+    if (!anchor) {
       api.send({ kind: "visual_empty" });
       return;
     }
-    const anchor = cursorState.focus;
     selectionState = {
       anchor,
       focus: nextGrapheme(anchor, 1),
@@ -776,47 +767,22 @@
   };
 
   const focusCursorEditable = () => {
-    if (!cursorState || !cursorState.focus.node.isConnected) {
-      const position = initialCursorPosition();
-      cursorState = position ? { focus: position, preferredX: null } : null;
-    }
-    let element = cursorState?.focus.editable ? cursorState.focus.node : null;
-    const textParent = cursorState?.focus.node?.parentElement;
-    if (!element && textParent) {
-      const candidate = textParent.closest("[contenteditable]");
-      if (candidate && isEditableElement(candidate)) {
-        element = candidate;
-      }
-    }
+    const element = closestCursorElement(
+      "input,textarea,select,[contenteditable]", isEditableElement);
     if (!element) {
       api.send({ kind: "cursor_input_unavailable" });
       return;
     }
     element.focus({ preventScroll: true });
-    if (!cursorState.focus.editable && element.isContentEditable) {
-      const selection = getSelection();
-      const range = document.createRange();
-      range.setStart(cursorState.focus.node, cursorState.focus.offset);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
     api.send({ kind: "cursor_input_focused", tag: element.tagName.toLowerCase() });
   };
 
   const activateCursor = () => {
-    if (!cursorState || !cursorState.focus.node.isConnected) {
-      const position = initialCursorPosition();
-      cursorState = position ? { focus: position, preferredX: null } : null;
-    }
-    let element = cursorState?.focus.actionable ? cursorState.focus.node : null;
-    const textParent = cursorState?.focus.node?.parentElement;
-    if (!element && textParent) {
-      element = textParent.closest(
-        "a[href],button,summary,[role='button'],[role='link']," +
-        "input[type='button'],input[type='submit'],input[type='reset']",
-      );
-    }
+    const element = closestCursorElement(
+      "a[href],button,summary,[role='button'],[role='link']," +
+      "input[type='button'],input[type='submit'],input[type='reset']",
+      (candidate) => !candidate.matches(":disabled"),
+    );
     if (!(element instanceof HTMLElement) || element.matches(":disabled")) {
       api.send({ kind: "cursor_activate_unavailable" });
       return;
@@ -868,6 +834,7 @@
     startAtCursor,
     hintInput,
     normalMove,
+    setGrid,
     focusCursorEditable,
     activateCursor,
     setNormalMode,
