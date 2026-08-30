@@ -282,6 +282,15 @@ wait_for_event 'selection page title' '"type":"title_changed"' '"title":"browser
 wait_for_event 'selection page completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$selection_page\""
 reset_events
 
+printf '%s\n' \
+  '{"type":"cursor_move","browser_id":1,"operation":"next_word"}' \
+  '{"type":"visual_cursor_start","browser_id":1}' \
+  >&"$daemon_input"
+wait_for_event 'visual mode from normal cursor' '"type":"mode_changed"' '"mode":"visual"'
+printf '%s\n' '{"type":"visual_yank","browser_id":1}' >&"$daemon_input"
+wait_for_event 'normal cursor word yank' '"type":"visual_yank"' '"text":"w"'
+reset_events
+
 printf '%s\n' '{"type":"visual_start","browser_id":1,"max_hints":300}' >&"$daemon_input"
 wait_for_event 'visual text hints' '"type":"visual_hints_ready"'
 printf '%s\n' \

@@ -89,15 +89,26 @@ assert_equal(sent[#sent].type, "scroll_to", "G command")
 assert_equal(sent[#sent].edge, "bottom", "G edge")
 
 feed("j")
-assert_equal(sent[#sent].type, "scroll", "j command")
-assert_equal(sent[#sent].dy, 120, "j scroll step")
+assert_equal(sent[#sent].type, "cursor_move", "j command")
+assert_equal(sent[#sent].operation, "down", "j cursor movement")
+
+feed("h")
+assert_equal(sent[#sent].type, "cursor_move", "h command")
+assert_equal(sent[#sent].operation, "previous_grapheme", "h cursor movement")
+
+state.ready = true
+feed("v")
+assert_equal(sent[#sent].type, "visual_cursor_start", "v must select from the normal cursor")
+assert_equal(state.mode, "visual", "v must enter browser visual mode")
+feed("<Esc>")
+assert_equal(sent[#sent].type, "visual_cancel", "escape must cancel browser visual mode")
+assert_equal(state.mode, "normal", "visual cancellation must restore normal mode")
 
 feed("H")
 assert_equal(sent[#sent].type, "back", "H navigation")
 feed("L")
 assert_equal(sent[#sent].type, "forward", "L navigation")
 
-state.ready = true
 feed("i")
 assert_equal(sent[#sent].type, "input_start", "i must request browser insert mode")
 

@@ -91,6 +91,10 @@ class CefBrowserManager {
                  std::string_view key,
                  std::string* error);
   bool CancelHints(std::uint32_t browser_id, std::string* error);
+  bool NormalMove(std::uint32_t browser_id,
+                  std::string_view operation,
+                  std::string* error);
+  bool StartVisualAtCursor(std::uint32_t browser_id, std::string* error);
   bool StartVisual(std::uint32_t browser_id,
                    int max_hints,
                    std::string* error);

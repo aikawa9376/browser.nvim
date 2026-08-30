@@ -13,14 +13,21 @@ function M.start(state)
     return false
   end
   local sent = ipc.send({
-    type = "visual_start",
+    type = "visual_cursor_start",
     browser_id = state.browser_id,
-    max_hints = config.get().visual.max_hints,
   })
   if sent then
-    state.mode = "visual_hint"
+    state.mode = "visual"
   end
   return sent
+end
+
+function M.move_cursor(state, operation)
+  ipc.send({
+    type = "cursor_move",
+    browser_id = state.browser_id,
+    operation = operation,
+  })
 end
 
 function M.hint_input(state, key)

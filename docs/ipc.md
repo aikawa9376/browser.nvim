@@ -65,14 +65,27 @@ The daemon responds with `mode_changed`, `hints_ready`, `hint_activated`,
 `hints_cancelled`, or `hints_empty`. A focused form target changes the mode to
 `insert`; a clicked target returns it to `normal`.
 
-DOM Visual Mode uses `visual_start` with `max_hints`, `visual_hint_input`,
-`visual_move`, `visual_yank`, and `visual_cancel`. Move operations are
+Browser Normal Mode exposes a persistent DOM text cursor. `cursor_move` accepts
+the same movement operations as Visual Mode except `swap`, and
+`visual_cursor_start` begins a one-grapheme selection at its current position:
+
+```json
+{"type":"cursor_move","browser_id":1,"operation":"next_word"}
+{"type":"visual_cursor_start","browser_id":1}
+```
+
+DOM Visual Mode then uses `visual_move`, `visual_yank`, and `visual_cancel`.
+Move operations are
 `previous_grapheme`, `next_grapheme`, `previous_word`, `next_word`, `up`,
 `down`, `line_start`, `line_end`, and `swap`. A successful yank emits:
 
 ```json
 {"type":"visual_yank","browser_id":1,"text":"selected text"}
 ```
+
+The earlier hint-based entry remains available through `visual_start` with
+`max_hints` followed by `visual_hint_input`; the Lua default uses the persistent
+cursor path.
 
 Browser Insert Mode accepts:
 

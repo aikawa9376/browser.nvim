@@ -6,9 +6,9 @@ pixels never pass through Lua.
 
 > [!IMPORTANT]
 > The implementation covers Phases 1–7: browser-buffer lifecycle, real CEF
-> rendering, keyboard navigation, link hints, Browser Insert Mode, DOM visual
-> selection, popup composition, and dirty-rectangle frame updates. Mouse input
-> is intentionally outside the MVP.
+> rendering, a persistent DOM cursor in Browser Normal Mode, link hints,
+> Browser Insert Mode, DOM visual selection, popup composition, and
+> dirty-rectangle frame updates. Mouse input is intentionally outside the MVP.
 
 ## Requirements
 
@@ -75,7 +75,6 @@ require("browser").setup({
   visual = {
     enabled = true,
     clipboard = false,
-    max_hints = 300,
   },
   rendering = {
     dirty_rects = true,
@@ -117,7 +116,10 @@ The default Browser Normal Mode mappings are:
 
 | Key | Action |
 | --- | --- |
-| `j` / `k` | Scroll the page |
+| `h` / `l` | Move the DOM cursor by Unicode grapheme |
+| `b` / `w` | Move the DOM cursor by word |
+| `j` / `k` | Move to the previous / next visual line |
+| `0` / `$` | Move to the visual line start / end |
 | `<C-d>` / `<C-u>` | Scroll half a viewport |
 | `<C-f>` / `<C-b>` | Scroll one viewport |
 | `gg` / `G` | Top / bottom |
@@ -125,19 +127,21 @@ The default Browser Normal Mode mappings are:
 | `r` | Reload |
 | `o` | Open a URL |
 | `f` | Start link hints |
-| `v` | Start DOM text hints and Browser Visual Mode |
+| `v` | Start Browser Visual Mode at the DOM cursor |
 | `i` | Send input to the currently focused page element |
 | `yy` | Yank the current URL |
 
-`<C-w>` mappings are not overridden, so normal Neovim window movement remains
-available. Link hints use labels generated from `asdfghjkl`. Choosing an
+Browser Normal Mode keeps a block cursor on rendered page text. Cursor motion
+scrolls when necessary, and page scrolling relocates an off-screen cursor to
+visible text. `<C-w>` mappings are not overridden, so normal Neovim window
+movement remains available. Link hints use labels generated from `asdfghjkl`. Choosing an
 `input`, `textarea`, or `select` focuses it and enters Browser Insert Mode.
 Committed UTF-8 text and Enter, Backspace, Delete, Tab, Shift-Tab, arrows,
 Home, End, Ctrl-A, Ctrl-C, and Ctrl-V are forwarded to CEF. `Esc` returns to
 Browser Normal Mode.
 
-Browser Visual Mode starts with visible-text hints and then operates on a DOM
-`Range`, not Neovim's native Visual mode:
+Browser Visual Mode starts at the Normal Mode cursor and operates on a DOM
+`Range`, not Neovim's native Visual mode. The same text motions remain active:
 
 | Key | Action |
 | --- | --- |

@@ -71,9 +71,9 @@ function M.attach(bufnr, state)
     if state.mode == "visual" then
       visual.move(state, "down")
     elseif state.mode == "normal" then
-      browser.scroll(state, config.get().scroll_step)
+      visual.move_cursor(state, "down")
     end
-  end, "scroll down")
+  end, "move down")
 
   map(bufnr, keys.scroll_up, function()
     if hint_input(state, "k") then
@@ -82,9 +82,9 @@ function M.attach(bufnr, state)
     if state.mode == "visual" then
       visual.move(state, "up")
     elseif state.mode == "normal" then
-      browser.scroll(state, -config.get().scroll_step)
+      visual.move_cursor(state, "up")
     end
-  end, "scroll up")
+  end, "move up")
 
   map(bufnr, keys.half_down, function()
     if state.mode == "normal" then
@@ -176,10 +176,14 @@ function M.attach(bufnr, state)
   }
   for key, operation in pairs(visual_moves) do
     map(bufnr, key, function()
-      if not hint_input(state, key) and state.mode == "visual" then
-        visual.move(state, operation)
+      if not hint_input(state, key) then
+        if state.mode == "visual" then
+          visual.move(state, operation)
+        elseif state.mode == "normal" then
+          visual.move_cursor(state, operation)
+        end
       end
-    end, "visual " .. operation)
+    end, "cursor " .. operation)
   end
 
   map(bufnr, "y", function()

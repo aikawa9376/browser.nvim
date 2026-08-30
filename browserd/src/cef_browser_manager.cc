@@ -19,6 +19,19 @@ JsonValue::Object Event(std::string type, std::uint32_t browser_id) {
   return event;
 }
 
+bool IsCaretOperation(std::string_view operation) {
+  constexpr std::string_view kOperations[] = {
+      "previous_grapheme", "next_grapheme", "previous_word", "next_word",
+      "up",                "down",          "line_start",    "line_end",
+  };
+  for (const std::string_view candidate : kOperations) {
+    if (operation == candidate) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool PrepareDirtyRects(const CefBrowserState& state,
                        const CefRenderHandler::RectList& dirty_rects,
                        int width,
@@ -561,6 +574,56 @@ bool CefBrowserManager::CancelHints(std::uint32_t browser_id,
   return true;
 }
 
+bool CefBrowserManager::NormalMove(std::uint32_t browser_id,
+                                   std::string_view operation,
+                                   std::string* error) {
+  CEF_REQUIRE_UI_THREAD();
+  CefBrowserState* state = Find(browser_id);
+  if (!state || state->destroying) {
+    if (error) {
+      *error = "unknown browser_id";
+    }
+    return false;
+  }
+  if (!state->browser || !state->page_ready || state->mode != "normal") {
+    if (error) {
+      *error = "cursor_move requires a ready page in normal mode";
+    }
+    return false;
+  }
+  if (!IsCaretOperation(operation)) {
+    if (error) {
+      *error = "unsupported cursor movement";
+    }
+    return false;
+  }
+  ExecuteScript(state, "window.__nvimBrowser.visual.normalMove(\"" +
+                           std::string(operation) + "\");");
+  return true;
+}
+
+bool CefBrowserManager::StartVisualAtCursor(std::uint32_t browser_id,
+                                            std::string* error) {
+  CEF_REQUIRE_UI_THREAD();
+  CefBrowserState* state = Find(browser_id);
+  if (!state || state->destroying) {
+    if (error) {
+      *error = "unknown browser_id";
+    }
+    return false;
+  }
+  if (!state->browser || !state->page_ready || state->mode != "normal") {
+    if (error) {
+      *error = "visual_cursor_start requires a ready page in normal mode";
+    }
+    return false;
+  }
+  SetMode(state, "visual");
+  ExecuteScript(state,
+                "window.__nvimBrowser.visual.startAtCursor();");
+  return true;
+}
+
 bool CefBrowserManager::StartVisual(std::uint32_t browser_id,
                                     int max_hints,
                                     std::string* error) {
@@ -646,19 +709,7 @@ bool CefBrowserManager::VisualMove(std::uint32_t browser_id,
     }
     return false;
   }
-  constexpr std::string_view kOperations[] = {
-      "previous_grapheme", "next_grapheme", "previous_word", "next_word",
-      "up",                "down",          "line_start",    "line_end",
-      "swap",
-  };
-  bool allowed = false;
-  for (const std::string_view candidate : kOperations) {
-    if (operation == candidate) {
-      allowed = true;
-      break;
-    }
-  }
-  if (!allowed) {
+  if (!IsCaretOperation(operation) && operation != "swap") {
     if (error) {
       *error = "unsupported visual movement";
     }
@@ -948,14 +999,16 @@ bool CefBrowserManager::HandleBridgeQuery(std::uint32_t browser_id,
     event.emplace("count", JsonValue(*count));
     sink_->Emit(JsonValue(std::move(event)));
   } else if (*kind == "visual_started") {
-    if (state->mode != "visual_hint") {
-      *error = "visual_started received outside visual_hint mode";
+    if (state->mode != "visual_hint" && state->mode != "visual") {
+      *error = "visual_started received outside a visual start";
       return false;
     }
-    SetMode(state, "visual");
+    if (state->mode == "visual_hint") {
+      SetMode(state, "visual");
+    }
   } else if (*kind == "visual_cancelled" || *kind == "visual_empty") {
-    if (state->mode != "visual_hint") {
-      *error = "visual cancellation received outside visual_hint mode";
+    if (state->mode != "visual_hint" && state->mode != "visual") {
+      *error = "visual cancellation received outside a visual mode";
       return false;
     }
     SetMode(state, "normal");
@@ -1217,6 +1270,12 @@ void CefBrowserManager::OnLoadingStateChange(std::uint32_t browser_id,
     for (std::string& script : scripts) {
       ExecuteScript(state, std::move(script));
     }
+    if (state->mode == "normal") {
+      ExecuteScript(
+          state,
+          "window.__nvimBrowser&&window.__nvimBrowser.visual&&"
+          "window.__nvimBrowser.visual.setNormalMode(true);");
+    }
   }
 }
 
@@ -1264,6 +1323,11 @@ void CefBrowserManager::SetMode(CefBrowserState* state, std::string mode) {
   JsonValue::Object event = Event("mode_changed", state->browser_id);
   event.emplace("mode", JsonValue(state->mode));
   sink_->Emit(JsonValue(std::move(event)));
+  ExecuteScript(
+      state,
+      "window.__nvimBrowser&&window.__nvimBrowser.visual&&"
+      "window.__nvimBrowser.visual.setNormalMode(" +
+          std::string(state->mode == "normal" ? "true" : "false") + ");");
 }
 
 bool CefBrowserManager::Render(CefBrowserState* state, std::string* error) {

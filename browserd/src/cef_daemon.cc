@@ -238,6 +238,21 @@ void CefDaemon::Handle(JsonValue message) {
     }
     return;
   }
+  if (*type == "cursor_move") {
+    const auto operation = message.String("operation");
+    if (!operation) {
+      Error("operation must be a string", browser_id);
+    } else if (!manager_.NormalMove(browser_id, *operation, &error)) {
+      Error(error, browser_id);
+    }
+    return;
+  }
+  if (*type == "visual_cursor_start") {
+    if (!manager_.StartVisualAtCursor(browser_id, &error)) {
+      Error(error, browser_id);
+    }
+    return;
+  }
   if (*type == "visual_start") {
     const auto max_hints = message.Integer("max_hints");
     if (!max_hints || *max_hints < 1 || *max_hints > 1000) {

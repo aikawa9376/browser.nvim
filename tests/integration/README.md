@@ -30,8 +30,10 @@ or `all` before starting Neovim.
     without using a mouse. `Esc` must remove an unfinished hint overlay.
 11. On `forms.html`, select the input hint, enter Japanese and emoji text, use
     editing keys, and return to Browser Normal Mode with `Esc`.
-12. On `selection.html`, press `v`, choose a text hint, move with
-    `h/l/w/b/j/k/0/$/o`, and press `y`. Verify the result with `:registers`.
+12. On `selection.html`, verify that a block cursor is always visible. Move it
+    with `h/l/w/b/j/k/0/$`, press `v` to select at that position, extend or
+    reverse the selection with `h/l/w/b/j/k/0/$/o`, and press `y`. Verify the
+    result with `:registers`.
 13. Repeat visual selection on `graphemes.html`; family emoji, combining text,
     and Japanese graphemes must not be split.
 14. Open `popup.html` and exercise a select popup, then open `animation.html`.

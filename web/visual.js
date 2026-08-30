@@ -9,6 +9,10 @@
   const alphabet = "asdfghjkl";
   let hintSession = null;
   let selectionState = null;
+  let cursorState = null;
+  let cursorMarker = null;
+  let normalMode = false;
+  let cursorRefreshPending = false;
 
   const excludedParent = (node) => {
     const parent = node.parentElement;
@@ -230,6 +234,93 @@
     return positions;
   };
 
+  const cursorRectangle = (position) => {
+    const next = nextGrapheme(position, 1);
+    if (next.node === position.node && next.offset > position.offset) {
+      const range = document.createRange();
+      range.setStart(position.node, position.offset);
+      range.setEnd(next.node, next.offset);
+      const rect = Array.from(range.getClientRects()).find(visibleRectangle) ||
+        range.getBoundingClientRect();
+      if (rect.height > 0) {
+        return rect;
+      }
+    }
+    return caretRectangle(position);
+  };
+
+  const ensureCursorMarker = () => {
+    if (cursorMarker?.isConnected) {
+      return cursorMarker;
+    }
+    cursorMarker = document.createElement("div");
+    cursorMarker.setAttribute("aria-hidden", "true");
+    cursorMarker.dataset.nvimBrowserCursor = "true";
+    Object.assign(cursorMarker.style, {
+      position: "fixed",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+      background: "#fff",
+      mixBlendMode: "difference",
+      opacity: "0.82",
+    });
+    document.documentElement.append(cursorMarker);
+    return cursorMarker;
+  };
+
+  const initialCursorPosition = () => {
+    const candidates = renderedPositions().filter(({ rect }) =>
+      rect.height > 0 && rect.bottom > 0 && rect.right >= 0 &&
+      rect.top < innerHeight && rect.left < innerWidth);
+    candidates.sort((left, right) =>
+      left.rect.top - right.rect.top || left.rect.left - right.rect.left);
+    return candidates[0]?.position || null;
+  };
+
+  const renderCursor = () => {
+    if (!normalMode) {
+      if (cursorMarker) {
+        cursorMarker.style.display = "none";
+      }
+      return;
+    }
+    if (!cursorState || !cursorState.focus.node.isConnected) {
+      const position = initialCursorPosition();
+      cursorState = position ? { focus: position, preferredX: null } : null;
+    }
+    if (!cursorState) {
+      return;
+    }
+    let rect = cursorRectangle(cursorState.focus);
+    if (!visibleRectangle(rect)) {
+      const position = initialCursorPosition();
+      if (!position) {
+        return;
+      }
+      cursorState = { focus: position, preferredX: null };
+      rect = cursorRectangle(position);
+    }
+    const marker = ensureCursorMarker();
+    Object.assign(marker.style, {
+      display: "block",
+      left: `${Math.max(0, rect.left)}px`,
+      top: `${Math.max(0, rect.top)}px`,
+      width: `${Math.max(2, rect.width)}px`,
+      height: `${Math.max(2, rect.height)}px`,
+    });
+  };
+
+  const scheduleCursorRefresh = () => {
+    if (!normalMode || cursorRefreshPending) {
+      return;
+    }
+    cursorRefreshPending = true;
+    requestAnimationFrame(() => {
+      cursorRefreshPending = false;
+      renderCursor();
+    });
+  };
+
   const applySelection = () => {
     if (!selectionState) {
       return;
@@ -260,13 +351,13 @@
     }
   };
 
-  const verticalMove = (direction) => {
-    const current = caretRectangle(selectionState.focus);
+  const verticalMove = (state, direction, apply) => {
+    const current = caretRectangle(state.focus);
     if (current.height <= 0) {
       return;
     }
-    if (selectionState.preferredX === null) {
-      selectionState.preferredX = current.left;
+    if (state.preferredX === null) {
+      state.preferredX = current.left;
     }
 
     const choose = () => {
@@ -290,8 +381,8 @@
         Math.abs(rect.top + rect.height / 2 - currentCenter) - verticalDistance,
       ) <= tolerance);
       nextLine.sort((left, right) =>
-        Math.abs(left.rect.left - selectionState.preferredX) -
-        Math.abs(right.rect.left - selectionState.preferredX));
+        Math.abs(left.rect.left - state.preferredX) -
+        Math.abs(right.rect.left - state.preferredX));
       return nextLine[0]?.position || null;
     };
 
@@ -301,13 +392,13 @@
       target = choose();
     }
     if (target) {
-      selectionState.focus = target;
-      applySelection();
+      state.focus = target;
+      apply();
     }
   };
 
-  const lineEdge = (end) => {
-    const current = caretRectangle(selectionState.focus);
+  const lineEdge = (state, end, apply) => {
+    const current = caretRectangle(state.focus);
     const center = current.top + current.height / 2;
     const tolerance = Math.max(2, current.height * 0.6);
     const line = renderedPositions().filter(({ rect }) =>
@@ -316,39 +407,52 @@
       return;
     }
     line.sort((left, right) => left.rect.left - right.rect.left);
-    selectionState.focus = (end ? line[line.length - 1] : line[0]).position;
-    selectionState.preferredX = null;
-    applySelection();
+    state.focus = (end ? line[line.length - 1] : line[0]).position;
+    state.preferredX = null;
+    apply();
+  };
+
+  const moveState = (state, operation, apply) => {
+    if (operation === "previous_grapheme" || operation === "next_grapheme") {
+      state.focus = nextGrapheme(
+        state.focus,
+        operation === "next_grapheme" ? 1 : -1,
+      );
+      state.preferredX = null;
+      apply();
+    } else if (operation === "previous_word" || operation === "next_word") {
+      state.focus = moveWord(
+        state.focus,
+        operation === "next_word" ? 1 : -1,
+      );
+      state.preferredX = null;
+      apply();
+    } else if (operation === "down" || operation === "up") {
+      verticalMove(state, operation === "down" ? 1 : -1, apply);
+    } else if (operation === "line_start" || operation === "line_end") {
+      lineEdge(state, operation === "line_end", apply);
+    } else if (operation === "swap" && state.anchor) {
+      const anchor = state.anchor;
+      state.anchor = state.focus;
+      state.focus = anchor;
+      state.preferredX = null;
+      apply();
+    }
   };
 
   const move = (operation) => {
-    if (!selectionState) {
+    if (selectionState) {
+      moveState(selectionState, operation, applySelection);
+    }
+  };
+
+  const normalMove = (operation) => {
+    if (!normalMode) {
       return;
     }
-    if (operation === "previous_grapheme" || operation === "next_grapheme") {
-      selectionState.focus = nextGrapheme(
-        selectionState.focus,
-        operation === "next_grapheme" ? 1 : -1,
-      );
-      selectionState.preferredX = null;
-      applySelection();
-    } else if (operation === "previous_word" || operation === "next_word") {
-      selectionState.focus = moveWord(
-        selectionState.focus,
-        operation === "next_word" ? 1 : -1,
-      );
-      selectionState.preferredX = null;
-      applySelection();
-    } else if (operation === "down" || operation === "up") {
-      verticalMove(operation === "down" ? 1 : -1);
-    } else if (operation === "line_start" || operation === "line_end") {
-      lineEdge(operation === "line_end");
-    } else if (operation === "swap") {
-      const anchor = selectionState.anchor;
-      selectionState.anchor = selectionState.focus;
-      selectionState.focus = anchor;
-      selectionState.preferredX = null;
-      applySelection();
+    renderCursor();
+    if (cursorState) {
+      moveState(cursorState, operation, renderCursor);
     }
   };
 
@@ -363,6 +467,16 @@
     cleanupHints();
     selectionState = null;
     getSelection()?.removeAllRanges();
+  };
+
+  const setNormalMode = (enabled) => {
+    normalMode = enabled;
+    if (enabled) {
+      clearSelection();
+      scheduleCursorRefresh();
+    } else if (cursorMarker) {
+      cursorMarker.style.display = "none";
+    }
   };
 
   const labelWidth = (count) => {
@@ -448,6 +562,29 @@
     api.send({ kind: "visual_hints_started", count: entries.length });
   };
 
+  const startAtCursor = () => {
+    if (!cursorState || !cursorState.focus.node.isConnected) {
+      const position = initialCursorPosition();
+      cursorState = position ? { focus: position, preferredX: null } : null;
+    }
+    if (!cursorState) {
+      api.send({ kind: "visual_empty" });
+      return;
+    }
+    const anchor = cursorState.focus;
+    selectionState = {
+      anchor,
+      focus: nextGrapheme(anchor, 1),
+      preferredX: null,
+    };
+    normalMode = false;
+    if (cursorMarker) {
+      cursorMarker.style.display = "none";
+    }
+    applySelection();
+    api.send({ kind: "visual_started" });
+  };
+
   const hintInput = (key) => {
     if (!hintSession || typeof key !== "string" || key.length !== 1 ||
         !alphabet.includes(key)) {
@@ -489,9 +626,15 @@
 
   api.visual = Object.freeze({
     start,
+    startAtCursor,
     hintInput,
+    normalMove,
+    setNormalMode,
     move,
     yank,
     cancel: clearSelection,
   });
+
+  addEventListener("scroll", scheduleCursorRefresh, { passive: true });
+  addEventListener("resize", scheduleCursorRefresh, { passive: true });
 })();

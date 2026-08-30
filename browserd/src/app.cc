@@ -179,6 +179,22 @@ bool App::Handle(const JsonValue& message) {
     }
     return true;
   }
+  if (*type == "cursor_move") {
+    if (state->mode != "normal") {
+      Error("cursor_move is only valid in normal mode", state->browser_id);
+    }
+    return true;
+  }
+  if (*type == "visual_cursor_start") {
+    if (state->mode != "normal") {
+      Error("visual_cursor_start is only valid in normal mode",
+            state->browser_id);
+    } else {
+      state->mode = "visual";
+      ModeChanged(*state);
+    }
+    return true;
+  }
   if (*type == "visual_start") {
     if (state->mode != "normal") {
       Error("visual_start is only valid in normal mode", state->browser_id);
