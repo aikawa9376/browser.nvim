@@ -223,6 +223,16 @@ wait_for_event 'forms page completion' '"type":"loading"' '"loading":false' "\"u
 reset_events
 
 printf '%s\n' \
+  '{"type":"cursor_move","browser_id":1,"operation":"next_word"}' \
+  '{"type":"input_cursor_start","browser_id":1}' \
+  >&"$daemon_input"
+wait_for_event 'input focus from normal cursor' '"type":"cursor_input_focused"' '"tag":"input"'
+wait_for_event 'insert mode from normal cursor' '"type":"mode_changed"' '"mode":"insert"'
+printf '%s\n' '{"type":"input_cancel","browser_id":1}' >&"$daemon_input"
+wait_for_event 'normal mode after cursor input' '"type":"mode_changed"' '"mode":"normal"'
+reset_events
+
+printf '%s\n' \
   '{"type":"hints_start","browser_id":1}' \
   '{"type":"hints_input","browser_id":1,"key":"a"}' \
   >&"$daemon_input"

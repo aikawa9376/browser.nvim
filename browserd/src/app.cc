@@ -236,6 +236,13 @@ bool App::Handle(const JsonValue& message) {
     }
     return true;
   }
+  if (*type == "input_cursor_start") {
+    if (state->mode != "normal") {
+      Error("input_cursor_start is only valid in normal mode",
+            state->browser_id);
+    }
+    return true;
+  }
   if (*type == "input_start") {
     if (state->mode != "normal") {
       Error("input_start is only valid in normal mode", state->browser_id);

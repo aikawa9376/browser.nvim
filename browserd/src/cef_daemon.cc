@@ -293,6 +293,12 @@ void CefDaemon::Handle(JsonValue message) {
     }
     return;
   }
+  if (*type == "input_cursor_start") {
+    if (!manager_.StartInputAtCursor(browser_id, &error)) {
+      Error(error, browser_id);
+    }
+    return;
+  }
   if (*type == "input_start") {
     if (!manager_.StartInput(browser_id, &error)) {
       Error(error, browser_id);

@@ -128,20 +128,24 @@ The default Browser Normal Mode mappings are:
 | `o` | Open a URL |
 | `f` | Start link hints |
 | `v` | Start Browser Visual Mode at the DOM cursor |
-| `i` | Send input to the currently focused page element |
+| `i` | Enter Insert Mode when the DOM cursor is on an editable element |
 | `yy` | Yank the current URL |
 
-Browser Normal Mode keeps a block cursor on rendered page text. Cursor motion
-scrolls when necessary, and page scrolling relocates an off-screen cursor to
-visible text. `<C-w>` mappings are not overridden, so normal Neovim window
+Browser Normal Mode keeps a block cursor on rendered page text. Editable form
+elements are cursor stops and use an outline instead of a text block; `i`
+focuses that element and enters both Browser and Neovim Insert Mode. Cursor
+motion scrolls when necessary, and page scrolling relocates an off-screen
+cursor to visible content. `<C-w>` mappings are not overridden, so normal Neovim window
 movement remains available. Link hints use labels generated from `asdfghjkl`. Choosing an
 `input`, `textarea`, or `select` focuses it and enters Browser Insert Mode.
 Committed UTF-8 text and Enter, Backspace, Delete, Tab, Shift-Tab, arrows,
 Home, End, Ctrl-A, Ctrl-C, and Ctrl-V are forwarded to CEF. `Esc` returns to
 Browser Normal Mode.
 
-Browser Visual Mode starts at the Normal Mode cursor and operates on a DOM
-`Range`, not Neovim's native Visual mode. The same text motions remain active:
+Browser Visual Mode starts at the Normal Mode cursor and uses a DOM `Range` for
+the actual page selection while also entering Neovim's native characterwise
+Visual mode. This keeps the editor mode indicator and Visual keymap context in
+sync. The same text motions remain active:
 
 | Key | Action |
 | --- | --- |

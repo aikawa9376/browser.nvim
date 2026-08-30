@@ -90,11 +90,18 @@ cursor path.
 Browser Insert Mode accepts:
 
 ```json
+{"type":"input_cursor_start","browser_id":1}
 {"type":"input_start","browser_id":1}
 {"type":"input_text","browser_id":1,"text":"日本語"}
 {"type":"input_key","browser_id":1,"key":"Backspace","shift":false,"control":false,"alt":false}
 {"type":"input_cancel","browser_id":1}
 ```
+
+`input_cursor_start` asks the injected DOM controller to focus the editable
+element under the Normal cursor. It emits `cursor_input_focused` and changes to
+`insert`, or emits `cursor_input_unavailable` without changing mode.
+`input_start` is retained for an element already focused by another operation,
+such as a form hint.
 
 Supported key names are `Enter`, `Backspace`, `Delete`, `Tab`, `Left`,
 `Right`, `Up`, `Down`, `Home`, `End`, and lowercase letters combined with

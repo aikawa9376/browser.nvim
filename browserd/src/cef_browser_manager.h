@@ -106,6 +106,7 @@ class CefBrowserManager {
                   std::string* error);
   bool VisualYank(std::uint32_t browser_id, std::string* error);
   bool CancelVisual(std::uint32_t browser_id, std::string* error);
+  bool StartInputAtCursor(std::uint32_t browser_id, std::string* error);
   bool StartInput(std::uint32_t browser_id, std::string* error);
   bool InputText(std::uint32_t browser_id,
                  std::string_view text,

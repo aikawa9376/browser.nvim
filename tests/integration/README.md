@@ -28,10 +28,13 @@ or `all` before starting Neovim.
    disappear.
 10. Open `links.html`, press `f`, and activate both a link and a form target
     without using a mouse. `Esc` must remove an unfinished hint overlay.
-11. On `forms.html`, select the input hint, enter Japanese and emoji text, use
-    editing keys, and return to Browser Normal Mode with `Esc`.
+11. On `forms.html`, move the Normal cursor onto the outlined input, press `i`,
+    and verify that Neovim enters Insert mode. Enter Japanese and emoji text,
+    use editing keys, and return to both Browser and Neovim Normal Mode with
+    `Esc`. Repeat once by selecting the input through `f` hints.
 12. On `selection.html`, verify that a block cursor is always visible. Move it
-    with `h/l/w/b/j/k/0/$`, press `v` to select at that position, extend or
+    with `h/l/w/b/j/k/0/$`, press `v`, and verify Neovim's mode indicator also
+    changes to Visual. Extend or
     reverse the selection with `h/l/w/b/j/k/0/$/o`, and press `y`. Verify the
     result with `:registers`.
 13. Repeat visual selection on `graphemes.html`; family emoji, combining text,

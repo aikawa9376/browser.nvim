@@ -5,6 +5,7 @@
 {"type":"visual_cursor_start","browser_id":1}
 {"type":"visual_move","browser_id":1,"operation":"next_word"}
 {"type":"visual_cancel","browser_id":1}
+{"type":"input_cursor_start","browser_id":1}
 {"type":"input_start","browser_id":1}
 {"type":"input_text","browser_id":1,"text":"フォーム入力"}
 {"type":"input_key","browser_id":1,"key":"Backspace"}

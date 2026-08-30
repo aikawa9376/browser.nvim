@@ -118,6 +118,11 @@ local function set_mode(state, mode)
   end
   local previous = state.mode
   state.mode = mode
+  if previous == "visual" and mode ~= "visual" then
+    mappings.leave_visual(state)
+  elseif previous ~= "visual" and mode == "visual" then
+    mappings.enter_visual(state)
+  end
   if previous == "insert" and mode ~= "insert" then
     mappings.leave_insert(state)
   elseif previous ~= "insert" and mode == "insert" then
@@ -291,6 +296,8 @@ local function on_event(event)
       visual.handle_yank(event.text)
       set_mode(state, "normal")
     end
+  elseif event.type == "cursor_input_unavailable" then
+    util.notify("browser.nvim: cursor is not on an editable element", vim.log.levels.INFO)
   elseif event.type == "error" then
     if state.mode ~= "normal" then
       set_mode(state, "normal")
@@ -369,6 +376,21 @@ function M.setup()
       if state and state.mode == "insert" then
         ipc.send({ type = "input_cancel", browser_id = state.browser_id })
         set_mode(state, "normal")
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("ModeChanged", {
+    group = augroup,
+    callback = function(event)
+      local state = states_by_buf[event.buf]
+      if not state or state.mode ~= "visual" then
+        return
+      end
+      local old_mode, new_mode = event.match:match("^([^:]+):(.+)$")
+      local was_visual = old_mode == "v" or old_mode == "V" or old_mode == "\22"
+      local is_visual = new_mode == "v" or new_mode == "V" or new_mode == "\22"
+      if was_visual and not is_visual then
+        visual.cancel(state)
       end
     end,
   })
@@ -567,7 +589,7 @@ function M.start_input(state)
   if not state or state.mode ~= "normal" or not state.ready or state.loading then
     return false
   end
-  return ipc.send({ type = "input_start", browser_id = state.browser_id })
+  return ipc.send({ type = "input_cursor_start", browser_id = state.browser_id })
 end
 
 function M.input_text(state, text)

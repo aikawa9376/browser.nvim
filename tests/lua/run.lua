@@ -100,9 +100,17 @@ state.ready = true
 feed("v")
 assert_equal(sent[#sent].type, "visual_cursor_start", "v must select from the normal cursor")
 assert_equal(state.mode, "visual", "v must enter browser visual mode")
+assert_equal(vim.api.nvim_get_mode().mode, "v", "browser visual mode must enter Neovim Visual mode")
 feed("<Esc>")
 assert_equal(sent[#sent].type, "visual_cancel", "escape must cancel browser visual mode")
 assert_equal(state.mode, "normal", "visual cancellation must restore normal mode")
+assert_equal(vim.api.nvim_get_mode().mode, "n", "visual cancellation must restore Neovim Normal mode")
+
+feed("v")
+assert_equal(vim.api.nvim_get_mode().mode, "v", "a second visual start must enter Neovim Visual mode")
+feed("<C-c>")
+assert_equal(sent[#sent].type, "visual_cancel", "leaving Neovim Visual mode must cancel DOM visual mode")
+assert_equal(state.mode, "normal", "external Visual exit must restore browser normal mode")
 
 feed("H")
 assert_equal(sent[#sent].type, "back", "H navigation")
@@ -110,7 +118,7 @@ feed("L")
 assert_equal(sent[#sent].type, "forward", "L navigation")
 
 feed("i")
-assert_equal(sent[#sent].type, "input_start", "i must request browser insert mode")
+assert_equal(sent[#sent].type, "input_cursor_start", "i must request insert mode at the DOM cursor")
 
 state.mode = "insert"
 local mappings = require("browser.mappings")

@@ -761,6 +761,27 @@ bool CefBrowserManager::CancelVisual(std::uint32_t browser_id,
   return true;
 }
 
+bool CefBrowserManager::StartInputAtCursor(std::uint32_t browser_id,
+                                           std::string* error) {
+  CEF_REQUIRE_UI_THREAD();
+  CefBrowserState* state = Find(browser_id);
+  if (!state || state->destroying) {
+    if (error) {
+      *error = "unknown browser_id";
+    }
+    return false;
+  }
+  if (!state->browser || !state->page_ready || state->mode != "normal") {
+    if (error) {
+      *error = "input_cursor_start requires a ready page in normal mode";
+    }
+    return false;
+  }
+  ExecuteScript(state,
+                "window.__nvimBrowser.visual.focusCursorEditable();");
+  return true;
+}
+
 bool CefBrowserManager::StartInput(std::uint32_t browser_id,
                                    std::string* error) {
   CEF_REQUIRE_UI_THREAD();
@@ -1030,6 +1051,26 @@ bool CefBrowserManager::HandleBridgeQuery(std::uint32_t browser_id,
     event.emplace("text", JsonValue(*text));
     sink_->Emit(JsonValue(std::move(event)));
     SetMode(state, "normal");
+  } else if (*kind == "cursor_input_focused") {
+    if (state->mode != "normal") {
+      *error = "cursor input focus received outside normal mode";
+      return false;
+    }
+    const std::string tag = message->String("tag").value_or("");
+    if (tag.empty() || tag.size() > 32) {
+      *error = "invalid cursor input target";
+      return false;
+    }
+    SetMode(state, "insert");
+    JsonValue::Object event = Event("cursor_input_focused", browser_id);
+    event.emplace("tag", JsonValue(tag));
+    sink_->Emit(JsonValue(std::move(event)));
+  } else if (*kind == "cursor_input_unavailable") {
+    if (state->mode != "normal") {
+      *error = "cursor input result received outside normal mode";
+      return false;
+    }
+    sink_->Emit(JsonValue(Event("cursor_input_unavailable", browser_id)));
   } else {
     *error = "unsupported bridge event";
     return false;

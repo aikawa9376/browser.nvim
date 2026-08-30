@@ -6,6 +6,15 @@ local anchor = require("browser.anchor")
 local M = {}
 
 local function map(bufnr, lhs, callback, description, nowait)
+  vim.keymap.set({ "n", "x" }, lhs, callback, {
+    buffer = bufnr,
+    silent = true,
+    nowait = nowait ~= false,
+    desc = "browser.nvim: " .. description,
+  })
+end
+
+local function nmap(bufnr, lhs, callback, description, nowait)
   vim.keymap.set("n", lhs, callback, {
     buffer = bufnr,
     silent = true,
@@ -46,6 +55,28 @@ function M.leave_insert(state)
     pcall(vim.cmd, "stopinsert")
   end
   anchor.install(state.bufnr, state)
+end
+
+local function editor_is_visual()
+  local mode = vim.api.nvim_get_mode().mode
+  return mode == "v" or mode == "V" or mode == "\22"
+end
+
+function M.enter_visual(state)
+  vim.schedule(function()
+    if state.mode == "visual"
+      and vim.api.nvim_get_current_buf() == state.bufnr
+      and not editor_is_visual()
+    then
+      pcall(vim.cmd, "normal! v")
+    end
+  end)
+end
+
+function M.leave_visual(state)
+  if vim.api.nvim_get_current_buf() == state.bufnr and editor_is_visual() then
+    vim.api.nvim_feedkeys("\27", "nx", false)
+  end
 end
 
 local function hint_input(state, key)
@@ -160,7 +191,7 @@ function M.attach(bufnr, state)
     end
   end, "browser visual mode")
 
-  map(bufnr, keys.yank_url, function()
+  nmap(bufnr, keys.yank_url, function()
     if state.mode == "normal" then
       browser.yank_url(state)
     end

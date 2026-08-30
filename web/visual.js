@@ -50,6 +50,39 @@
     return nodes;
   };
 
+  const isEditableElement = (element) => {
+    if (!(element instanceof HTMLElement) || element.matches(":disabled") ||
+        element.hasAttribute("readonly")) {
+      return false;
+    }
+    if (element.isContentEditable || element.matches("textarea,select")) {
+      return true;
+    }
+    if (!element.matches("input")) {
+      return false;
+    }
+    return [
+      "text", "search", "email", "url", "tel", "password", "number",
+      "date", "time", "datetime-local", "month", "week",
+    ].includes(element.type);
+  };
+
+  const editableElements = (visibleOnly = false) =>
+    Array.from(document.querySelectorAll("input,textarea,select,[contenteditable]"))
+      .filter((element) => {
+        if (!isEditableElement(element)) {
+          return false;
+        }
+        const style = getComputedStyle(element);
+        if (style.display === "none" || style.visibility === "hidden" ||
+            Number.parseFloat(style.opacity) === 0) {
+          return false;
+        }
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 &&
+          (!visibleOnly || visibleRectangle(rect));
+      });
+
   const positionOrder = (left, right) => {
     if (left.node === right.node) {
       return Math.sign(left.offset - right.offset);
@@ -176,6 +209,9 @@
   };
 
   const caretRectangle = (position) => {
+    if (position.editable) {
+      return position.node.getBoundingClientRect();
+    }
     const range = document.createRange();
     range.setStart(position.node, position.offset);
     range.collapse(true);
@@ -234,7 +270,39 @@
     return positions;
   };
 
+  const normalPositions = (wordsOnly = false, visibleOnly = false) => {
+    const positions = [];
+    for (const node of selectableNodes(visibleOnly)) {
+      const offsets = wordsOnly
+        ? wordSegments(node.data).map((segment) => segment.start)
+        : graphemeBoundaries(node.data);
+      for (const offset of offsets) {
+        const position = { node, offset };
+        const rect = caretRectangle(position);
+        if (!visibleOnly || (rect.height > 0 && rect.bottom >= -2 &&
+            rect.top <= innerHeight + 2)) {
+          positions.push({ position, rect });
+        }
+        if (positions.length >= 6000) {
+          break;
+        }
+      }
+      if (positions.length >= 6000) {
+        break;
+      }
+    }
+    for (const element of editableElements(visibleOnly)) {
+      const position = { node: element, offset: 0, editable: true };
+      positions.push({ position, rect: element.getBoundingClientRect() });
+    }
+    positions.sort((left, right) => positionOrder(left.position, right.position));
+    return positions;
+  };
+
   const cursorRectangle = (position) => {
+    if (position.editable) {
+      return position.node.getBoundingClientRect();
+    }
     const next = nextGrapheme(position, 1);
     if (next.node === position.node && next.offset > position.offset) {
       const range = document.createRange();
@@ -269,7 +337,7 @@
   };
 
   const initialCursorPosition = () => {
-    const candidates = renderedPositions().filter(({ rect }) =>
+    const candidates = normalPositions(false, true).filter(({ rect }) =>
       rect.height > 0 && rect.bottom > 0 && rect.right >= 0 &&
       rect.top < innerHeight && rect.left < innerWidth);
     candidates.sort((left, right) =>
@@ -301,12 +369,16 @@
       rect = cursorRectangle(position);
     }
     const marker = ensureCursorMarker();
+    const editable = Boolean(cursorState.focus.editable);
     Object.assign(marker.style, {
       display: "block",
       left: `${Math.max(0, rect.left)}px`,
       top: `${Math.max(0, rect.top)}px`,
-      width: `${Math.max(2, rect.width)}px`,
+      width: `${Math.max(editable ? 4 : 2, rect.width)}px`,
       height: `${Math.max(2, rect.height)}px`,
+      background: editable ? "transparent" : "#fff",
+      outline: editable ? "2px solid #fff" : "none",
+      outlineOffset: editable ? "-2px" : "0",
     });
   };
 
@@ -351,7 +423,7 @@
     }
   };
 
-  const verticalMove = (state, direction, apply) => {
+  const verticalMove = (state, direction, apply, positions = renderedPositions) => {
     const current = caretRectangle(state.focus);
     if (current.height <= 0) {
       return;
@@ -362,7 +434,7 @@
 
     const choose = () => {
       const currentCenter = current.top + current.height / 2;
-      const directional = renderedPositions().filter(({ rect }) => {
+      const directional = positions().filter(({ rect }) => {
         const center = rect.top + rect.height / 2;
         return direction > 0 ? center > currentCenter + 1 : center < currentCenter - 1;
       });
@@ -397,11 +469,11 @@
     }
   };
 
-  const lineEdge = (state, end, apply) => {
+  const lineEdge = (state, end, apply, positions = renderedPositions) => {
     const current = caretRectangle(state.focus);
     const center = current.top + current.height / 2;
     const tolerance = Math.max(2, current.height * 0.6);
-    const line = renderedPositions().filter(({ rect }) =>
+    const line = positions().filter(({ rect }) =>
       Math.abs(rect.top + rect.height / 2 - center) <= tolerance);
     if (line.length === 0) {
       return;
@@ -451,8 +523,44 @@
       return;
     }
     renderCursor();
-    if (cursorState) {
-      moveState(cursorState, operation, renderCursor);
+    if (!cursorState) {
+      return;
+    }
+    if (operation === "previous_grapheme" || operation === "next_grapheme" ||
+        operation === "previous_word" || operation === "next_word") {
+      const direction = operation.startsWith("next_") ? 1 : -1;
+      const candidates = normalPositions(operation.endsWith("word"), false);
+      let target = null;
+      if (direction > 0) {
+        target = candidates.find(({ position }) =>
+          positionOrder(position, cursorState.focus) > 0)?.position || null;
+      } else {
+        for (let index = candidates.length - 1; index >= 0; index -= 1) {
+          if (positionOrder(candidates[index].position, cursorState.focus) < 0) {
+            target = candidates[index].position;
+            break;
+          }
+        }
+      }
+      if (target) {
+        cursorState.focus = target;
+        cursorState.preferredX = null;
+        renderCursor();
+      }
+    } else if (operation === "down" || operation === "up") {
+      verticalMove(
+        cursorState,
+        operation === "down" ? 1 : -1,
+        renderCursor,
+        () => normalPositions(false, true),
+      );
+    } else if (operation === "line_start" || operation === "line_end") {
+      lineEdge(
+        cursorState,
+        operation === "line_end",
+        renderCursor,
+        () => normalPositions(false, true),
+      );
     }
   };
 
@@ -567,7 +675,7 @@
       const position = initialCursorPosition();
       cursorState = position ? { focus: position, preferredX: null } : null;
     }
-    if (!cursorState) {
+    if (!cursorState || cursorState.focus.editable) {
       api.send({ kind: "visual_empty" });
       return;
     }
@@ -583,6 +691,31 @@
     }
     applySelection();
     api.send({ kind: "visual_started" });
+  };
+
+  const focusCursorEditable = () => {
+    let element = cursorState?.focus.editable ? cursorState.focus.node : null;
+    const textParent = cursorState?.focus.node?.parentElement;
+    if (!element && textParent) {
+      const candidate = textParent.closest("[contenteditable]");
+      if (candidate && isEditableElement(candidate)) {
+        element = candidate;
+      }
+    }
+    if (!element) {
+      api.send({ kind: "cursor_input_unavailable" });
+      return;
+    }
+    element.focus({ preventScroll: true });
+    if (!cursorState.focus.editable && element.isContentEditable) {
+      const selection = getSelection();
+      const range = document.createRange();
+      range.setStart(cursorState.focus.node, cursorState.focus.offset);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    api.send({ kind: "cursor_input_focused", tag: element.tagName.toLowerCase() });
   };
 
   const hintInput = (key) => {
@@ -629,6 +762,7 @@
     startAtCursor,
     hintInput,
     normalMove,
+    focusCursorEditable,
     setNormalMode,
     move,
     yank,

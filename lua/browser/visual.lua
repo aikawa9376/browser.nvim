@@ -18,6 +18,7 @@ function M.start(state)
   })
   if sent then
     state.mode = "visual"
+    require("browser.mappings").enter_visual(state)
   end
   return sent
 end
@@ -63,6 +64,7 @@ function M.cancel(state)
     browser_id = state.browser_id,
   })
   state.mode = "normal"
+  require("browser.mappings").leave_visual(state)
 end
 
 function M.handle_yank(text)
