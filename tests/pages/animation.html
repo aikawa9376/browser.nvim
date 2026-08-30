@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><title>browser.nvim animation</title>
+  <style>
+    .box { width:80px;height:80px;background:#e65;animation:move 1s alternate infinite linear }
+    @keyframes move { from { transform:translateX(0) } to { transform:translateX(320px) } }
+  </style>
+</head>
+<body><div class="box"></div><output id="counter"></output>
+<script>
+  let frame = 0;
+  function tick() { document.querySelector('#counter').value = String(frame++); requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>browser.nvim forms</title></head>
+<body>
+  <label>Text <input id="text" value="editable text"></label>
+  <label>Area <textarea>multiple lines</textarea></label>
+  <label>Choice <select><option>Alpha</option><option>Beta</option></select></label>
+  <button type="submit">Submit</button>
+  <script>
+    const input = document.querySelector('#text');
+    const report = () => { document.title = `browser.nvim input:${input.value}`; };
+    input.addEventListener('input', report);
+    input.addEventListener('keydown', () => setTimeout(report));
+  </script>
+</body>
+</html>

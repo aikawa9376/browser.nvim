@@ -1,0 +1,11 @@
+#pragma once
+
+namespace browser {
+
+inline constexpr char kBridgeScript[] = R"browser_js(
+@BROWSER_BRIDGE_JS@
+@BROWSER_HINTS_JS@
+@BROWSER_VISUAL_JS@
+)browser_js";
+
+}  // namespace browser

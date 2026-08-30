@@ -1,0 +1,10 @@
+{"type":"create","browser_id":1,"url":"https://example.com","cols":20,"rows":10,"width":200,"height":200,"fps":60,"anchor_image_id":101,"anchor_placement_id":102,"browser_image_id":103,"browser_placement_id":104}
+{"type":"attach","browser_id":1,"cols":20,"rows":10,"full_frame":true}
+{"type":"navigate","browser_id":1,"url":"https://example.org/日本語"}
+{"type":"input_start","browser_id":1}
+{"type":"input_text","browser_id":1,"text":"フォーム入力"}
+{"type":"input_key","browser_id":1,"key":"Backspace"}
+{"type":"input_cancel","browser_id":1}
+{"type":"detach","browser_id":1}
+{"type":"destroy","browser_id":1}
+{"type":"shutdown"}

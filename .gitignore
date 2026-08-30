@@ -1,0 +1,6 @@
+/build/
+/browserd/build/
+/deps/
+*.swp
+*.swo
+nvim.log

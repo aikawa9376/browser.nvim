@@ -1,0 +1,27 @@
+execute_process(
+  COMMAND "${BROWSERD}" --dry-run
+  INPUT_FILE "${INPUT}"
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE error
+  RESULT_VARIABLE result
+)
+
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "browserd failed (${result}): ${error}")
+endif()
+
+foreach(expected
+    "\"type\":\"terminal_metrics\""
+    "\"type\":\"created\""
+    "\"mode\":\"insert\""
+    "https://example.org/日本語")
+  string(FIND "${output}" "${expected}" position)
+  if(position EQUAL -1)
+    message(FATAL_ERROR "missing '${expected}' in output: ${output}")
+  endif()
+endforeach()
+
+string(FIND "${output}" "\"type\":\"error\"" error_event)
+if(NOT error_event EQUAL -1)
+  message(FATAL_ERROR "unexpected protocol error: ${output}")
+endif()

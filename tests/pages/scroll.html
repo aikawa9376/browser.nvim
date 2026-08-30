@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>browser.nvim scroll:top:0</title>
+  <script>
+    function reportScrollPosition() {
+      const root = document.scrollingElement;
+      const maximum = Math.max(0, root.scrollHeight - window.innerHeight);
+      const position = window.scrollY <= 0
+        ? "top"
+        : (window.scrollY >= maximum - 1 ? "bottom" : "middle");
+      document.title = `browser.nvim scroll:${position}:${Math.round(window.scrollY)}`;
+    }
+    addEventListener("scroll", reportScrollPosition, { passive: true });
+    addEventListener("load", () => requestAnimationFrame(reportScrollPosition));
+  </script>
+</head>
+<body>
+  <h1 id="top">Top</h1>
+  <div style="height:2400px;background:linear-gradient(#eef,#fee)"></div>
+  <h2 id="bottom">Bottom</h2>
+</body>
+</html>

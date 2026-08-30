@@ -1,0 +1,152 @@
+local anchor = require("browser.anchor")
+local util = require("browser.util")
+
+local M = {}
+
+local buffer_options = {
+  buftype = "nofile",
+  bufhidden = "hide",
+  swapfile = false,
+  modifiable = false,
+  filetype = "browser",
+  modeline = false,
+  undofile = false,
+}
+
+local window_options = {
+  number = false,
+  relativenumber = false,
+  signcolumn = "no",
+  foldcolumn = "0",
+  wrap = false,
+  cursorline = false,
+  cursorcolumn = false,
+  list = false,
+  spell = false,
+  colorcolumn = "",
+  statuscolumn = "",
+  scrolloff = 0,
+  sidescrolloff = 0,
+}
+
+local function browser_name(url)
+  local authority = url:match("^%a[%w+.-]*://([^/%?#]+)")
+  if authority then
+    return "browser://" .. authority
+  end
+  local scheme_value = url:match("^(%a[%w+.-]*:[^%s]+)")
+  if scheme_value then
+    return "browser://" .. scheme_value:gsub("[^%w._~-]", "-")
+  end
+  return "browser://new-tab"
+end
+
+local function name_in_use(name, except)
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if bufnr ~= except and vim.api.nvim_buf_is_valid(bufnr) then
+      if vim.api.nvim_buf_get_name(bufnr) == name then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function unique_name(url, except)
+  local base = browser_name(url)
+  if not name_in_use(base, except) then
+    return base
+  end
+  local suffix = 2
+  while name_in_use(base .. "#" .. suffix, except) do
+    suffix = suffix + 1
+  end
+  return base .. "#" .. suffix
+end
+
+function M.create(url, state)
+  local bufnr = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_name(bufnr, unique_name(url))
+  for option, value in pairs(buffer_options) do
+    vim.api.nvim_set_option_value(option, value, { buf = bufnr })
+  end
+  anchor.install(bufnr, state)
+  return bufnr
+end
+
+function M.rename(bufnr, url)
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_set_name(bufnr, unique_name(url, bufnr))
+  end
+end
+
+function M.configure_window(winid)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  for option, value in pairs(window_options) do
+    vim.api.nvim_set_option_value(option, value, { win = winid, scope = "local" })
+  end
+  M.pin_view(winid)
+end
+
+function M.pin_view(winid)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  vim.api.nvim_win_call(winid, function()
+    vim.fn.winrestview({ topline = 1, leftcol = 0, skipcol = 0, lnum = 1, col = 0 })
+  end)
+end
+
+function M.windows(bufnr)
+  local windows = {}
+  for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+      if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
+        windows[#windows + 1] = winid
+      end
+    end
+  end
+  return windows
+end
+
+function M.show_error(bufnr, lines)
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  anchor.clear(bufnr)
+  vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
+end
+
+function M.restore_anchor(bufnr, state)
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    anchor.install(bufnr, state)
+  end
+end
+
+function M.reject_duplicate(winid)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  local error_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = error_buf })
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = error_buf })
+  vim.api.nvim_set_option_value("swapfile", false, { buf = error_buf })
+  vim.api.nvim_set_option_value("filetype", "browser-error", { buf = error_buf })
+  vim.api.nvim_buf_set_lines(error_buf, 0, -1, false, {
+    "browser.nvim:",
+    "",
+    "A browser buffer can only be displayed in one window at a time.",
+  })
+  vim.api.nvim_set_option_value("modifiable", false, { buf = error_buf })
+  vim.api.nvim_win_set_buf(winid, error_buf)
+  util.notify(
+    "A browser buffer can only be displayed in one window at a time.",
+    vim.log.levels.ERROR
+  )
+end
+
+return M
