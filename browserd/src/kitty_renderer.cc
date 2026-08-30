@@ -361,11 +361,25 @@ bool KittyRenderer::PlaceRelative(std::uint32_t image_id,
     }
     return false;
   }
+  return Write(GraphicsCommand(RelativePlacementControl(
+                   image_id, placement_id, parent_image_id,
+                   parent_placement_id, columns, rows)),
+               error);
+}
+
+std::string KittyRenderer::RelativePlacementControl(
+    std::uint32_t image_id,
+    std::uint32_t placement_id,
+    std::uint32_t parent_image_id,
+    std::uint32_t parent_placement_id,
+    int columns,
+    int rows) {
   std::ostringstream control;
   control << "a=p,i=" << image_id << ",p=" << placement_id
           << ",P=" << parent_image_id << ",Q=" << parent_placement_id
-          << ",H=0,V=0,c=" << columns << ",r=" << rows << ",C=1,q=2";
-  return Write(GraphicsCommand(control.str()), error);
+          << ",H=0,V=0,c=" << columns << ",r=" << rows
+          << ",z=-1,C=1,q=2";
+  return control.str();
 }
 
 bool KittyRenderer::DeletePlacement(std::uint32_t image_id,

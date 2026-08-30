@@ -26,6 +26,8 @@ int main() {
 
   assert(KittyRenderer::FrameUpdateControl(19, 2, 3, 4, 5, 80) ==
          "a=f,f=32,t=s,s=4,v=5,S=80,i=19,q=2,x=2,y=3,r=1,X=1");
+  assert(KittyRenderer::RelativePlacementControl(19, 20, 21, 22, 80, 24) ==
+         "a=p,i=19,p=20,P=21,Q=22,H=0,V=0,c=80,r=24,z=-1,C=1,q=2");
   KittyRenderer dry_run(true);
   std::vector<std::uint8_t> region(4U * 5U * 4U, 255);
   std::string error;

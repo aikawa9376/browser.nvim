@@ -71,6 +71,13 @@ class KittyRenderer {
                                         int width,
                                         int height,
                                         std::size_t bytes);
+  static std::string RelativePlacementControl(
+      std::uint32_t image_id,
+      std::uint32_t placement_id,
+      std::uint32_t parent_image_id,
+      std::uint32_t parent_placement_id,
+      int columns,
+      int rows);
   static std::vector<std::uint8_t> Gradient(int width, int height);
 
  private:
