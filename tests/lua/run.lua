@@ -88,6 +88,11 @@ feed("G")
 assert_equal(sent[#sent].type, "scroll_to", "G command")
 assert_equal(sent[#sent].edge, "bottom", "G edge")
 
+state.ready = true
+local before_unready_move = #sent
+feed("j")
+assert_equal(#sent, before_unready_move, "cursor movement must wait for the page handshake")
+state.page_ready = true
 feed("j")
 assert_equal(sent[#sent].type, "cursor_move", "j command")
 assert_equal(sent[#sent].operation, "down", "j cursor movement")
@@ -96,7 +101,6 @@ feed("h")
 assert_equal(sent[#sent].type, "cursor_move", "h command")
 assert_equal(sent[#sent].operation, "previous_grapheme", "h cursor movement")
 
-state.ready = true
 feed("<CR>")
 assert_equal(sent[#sent].type, "cursor_activate", "enter must activate the spatial cursor target")
 

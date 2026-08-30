@@ -8,7 +8,7 @@ function M.start(state)
   if not config.get().visual.enabled then
     return false
   end
-  if not state.ready or state.loading then
+  if not state.ready or not state.page_ready then
     util.notify("browser.nvim: page is still loading", vim.log.levels.WARN)
     return false
   end
@@ -24,7 +24,10 @@ function M.start(state)
 end
 
 function M.move_cursor(state, operation)
-  ipc.send({
+  if not state or state.mode ~= "normal" or not state.page_ready then
+    return false
+  end
+  return ipc.send({
     type = "cursor_move",
     browser_id = state.browser_id,
     operation = operation,

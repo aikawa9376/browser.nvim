@@ -115,11 +115,11 @@ int main(int argc, char** argv) {
 
   if (show_version) {
 #ifdef BROWSER_WITH_CEF
-    std::cout << "browserd protocol=2 cef=" << CEF_VERSION << " chromium="
+    std::cout << "browserd protocol=3 cef=" << CEF_VERSION << " chromium="
               << CHROME_VERSION_MAJOR << '.' << CHROME_VERSION_MINOR << '.'
               << CHROME_VERSION_BUILD << '.' << CHROME_VERSION_PATCH << '\n';
 #else
-    std::cout << "browserd protocol=2 phase1-gradient\n";
+    std::cout << "browserd protocol=3 phase1-gradient\n";
 #endif
     return 0;
   }

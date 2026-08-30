@@ -87,6 +87,9 @@ bool CefBrowserClient::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
                                       bool,
                                       bool) {
   browser_router_->OnBeforeBrowse(browser, frame);
+  if (frame && frame->IsMain()) {
+    manager_->OnMainFrameNavigationStarted(browser_id_);
+  }
   return false;
 }
 
@@ -94,6 +97,7 @@ void CefBrowserClient::OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
                                                  TerminationStatus,
                                                  int,
                                                  const CefString&) {
+  manager_->OnMainFrameNavigationStarted(browser_id_);
   browser_router_->OnRenderProcessTerminated(browser);
 }
 

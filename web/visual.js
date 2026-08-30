@@ -11,6 +11,7 @@
   let selectionState = null;
   let cursorState = { x: 0, y: 0 };
   let cursorGrid = { width: 10, height: 20 };
+  let cursorHost = null;
   let cursorMarker = null;
   let normalMode = false;
   let cursorRefreshPending = false;
@@ -308,21 +309,33 @@
   };
 
   const ensureCursorMarker = () => {
-    if (cursorMarker?.isConnected) {
+    if (cursorHost?.isConnected && cursorMarker) {
       return cursorMarker;
     }
+    cursorHost = document.createElement("nvim-browser-cursor");
+    cursorHost.setAttribute("aria-hidden", "true");
+    cursorHost.style.setProperty("all", "initial", "important");
+    cursorHost.style.setProperty("display", "block", "important");
+    cursorHost.style.setProperty("position", "fixed", "important");
+    cursorHost.style.setProperty("inset", "0", "important");
+    cursorHost.style.setProperty("width", "100vw", "important");
+    cursorHost.style.setProperty("height", "100vh", "important");
+    cursorHost.style.setProperty("pointer-events", "none", "important");
+    cursorHost.style.setProperty("z-index", "2147483647", "important");
+    cursorHost.style.setProperty("contain", "strict", "important");
+    const shadow = cursorHost.attachShadow({ mode: "closed" });
     cursorMarker = document.createElement("div");
     cursorMarker.setAttribute("aria-hidden", "true");
     cursorMarker.dataset.nvimBrowserCursor = "true";
     Object.assign(cursorMarker.style, {
-      position: "fixed",
+      position: "absolute",
       pointerEvents: "none",
-      zIndex: "2147483647",
       boxSizing: "border-box",
       boxShadow: "0 0 0 1px rgba(0,0,0,.75)",
       opacity: "1",
     });
-    document.documentElement.append(cursorMarker);
+    shadow.append(cursorMarker);
+    document.documentElement.append(cursorHost);
     return cursorMarker;
   };
 
@@ -842,6 +855,8 @@
     yank,
     cancel: clearSelection,
   });
+
+  api.send({ kind: "page_ready" });
 
   addEventListener("scroll", scheduleCursorRefresh, { passive: true });
   addEventListener("resize", scheduleCursorRefresh, { passive: true });

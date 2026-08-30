@@ -67,7 +67,7 @@ function M.preflight()
   end
   local daemon_version = vim.system({ executable, "--version" }, { text = true }):wait(3000)
   if daemon_version.code ~= 0
-    or not (daemon_version.stdout or ""):find("protocol=2", 1, true)
+    or not (daemon_version.stdout or ""):find("protocol=3", 1, true)
   then
     return false,
       ("browser.nvim: browserd is out of date: %s\nRebuild it with cmake."):format(executable)

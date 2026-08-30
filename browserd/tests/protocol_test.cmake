@@ -32,7 +32,7 @@ execute_process(
   ERROR_VARIABLE version_error
   RESULT_VARIABLE version_result
 )
-if(NOT version_result EQUAL 0 OR NOT version_output MATCHES "protocol=2")
+if(NOT version_result EQUAL 0 OR NOT version_output MATCHES "protocol=3")
   message(FATAL_ERROR
-    "browserd did not report protocol=2 (${version_result}): ${version_output}${version_error}")
+    "browserd did not report protocol=3 (${version_result}): ${version_output}${version_error}")
 endif()

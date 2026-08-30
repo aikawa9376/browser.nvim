@@ -4,7 +4,7 @@ local util = require("browser.util")
 local M = {}
 
 function M.start(state)
-  if not state.ready or state.loading then
+  if not state.ready or not state.page_ready then
     util.notify("browser.nvim: page is still loading", vim.log.levels.WARN)
     return false
   end

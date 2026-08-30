@@ -149,6 +149,7 @@ class CefBrowserManager {
                             bool loading,
                             bool can_go_back,
                             bool can_go_forward);
+  void OnMainFrameNavigationStarted(std::uint32_t browser_id);
 
  private:
   static bool ReadPositive(const JsonValue& message,
@@ -164,9 +165,10 @@ class CefBrowserManager {
                      std::span<const PixelRect> rects,
                      std::string* error);
   bool CleanupKitty(CefBrowserState* state, std::string* error);
-  static void ExecuteNavigationCommand(CefBrowserState* state,
-                                       std::string_view command);
+  void ExecuteNavigationCommand(CefBrowserState* state,
+                                std::string_view command);
   static void ExecuteScript(CefBrowserState* state, std::string script);
+  void SetPageReady(CefBrowserState* state, bool ready);
   void SetMode(CefBrowserState* state, std::string mode);
   void EmitError(std::uint32_t browser_id, std::string message);
 

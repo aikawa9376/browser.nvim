@@ -131,6 +131,7 @@ local function set_mode(state, mode)
 end
 
 local function cancel_ephemeral_mode(state)
+  state.pending_page_action = nil
   if state.mode == "hint" then
     ipc.send({ type = "hints_cancel", browser_id = state.browser_id })
   elseif state.mode == "visual" or state.mode == "visual_hint" then
@@ -263,6 +264,17 @@ local function on_event(event)
     state.loading = not not event.loading
     state.can_go_back = not not event.can_go_back
     state.can_go_forward = not not event.can_go_forward
+  elseif event.type == "page_ready" then
+    state.page_ready = not not event.ready
+    if state.page_ready and state.pending_page_action == "input" then
+      state.pending_page_action = nil
+      if state.visible
+        and state.mode == "normal"
+        and vim.api.nvim_get_current_buf() == state.bufnr
+      then
+        M.start_input(state)
+      end
+    end
   elseif event.type == "created" then
     state.ready = true
   elseif event.type == "mode_changed" and type(event.mode) == "string" then
@@ -497,6 +509,7 @@ function M.open(url)
     mode = "normal",
     loading = false,
     ready = false,
+    page_ready = false,
     can_go_back = false,
     can_go_forward = false,
     crashed = false,
@@ -531,6 +544,7 @@ function M.navigate(state, url)
   end
   url = normalize_url(url)
   state.url = url
+  state.page_ready = false
   ipc.send({ type = "navigate", browser_id = state.browser_id, url = url })
 end
 
@@ -588,15 +602,20 @@ end
 
 function M.start_input(state)
   state = state or state_for_current()
-  if not state or state.mode ~= "normal" or not state.ready or state.loading then
+  if not state or state.mode ~= "normal" or not state.ready then
     return false
   end
+  if not state.page_ready then
+    state.pending_page_action = "input"
+    return true
+  end
+  state.pending_page_action = nil
   return ipc.send({ type = "input_cursor_start", browser_id = state.browser_id })
 end
 
 function M.activate_cursor(state)
   state = state or state_for_current()
-  if not state or state.mode ~= "normal" or not state.ready or state.loading then
+  if not state or state.mode ~= "normal" or not state.ready or not state.page_ready then
     return false
   end
   return ipc.send({ type = "cursor_activate", browser_id = state.browser_id })
