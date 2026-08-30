@@ -47,6 +47,8 @@ local function count_messages(kind)
   return count
 end
 
+vim.api.nvim_set_option_value("winhighlight", "CursorLine:Visual", { win = 0 })
+vim.api.nvim_set_option_value("fillchars", "vert:!,eob:~", { scope = "global" })
 local state = assert(browser.open("example.com"))
 vim.wait(100, function()
   return count_messages("attach") > 0
@@ -62,6 +64,18 @@ assert_equal(vim.bo[state.bufnr].filetype, "browser", "filetype")
 assert_equal(vim.api.nvim_buf_get_lines(state.bufnr, 0, 1, false)[1], anchor.anchor_text, "anchor text")
 assert_equal(state.pixel_width, vim.api.nvim_win_get_width(0) * 9, "pixel width")
 assert_equal(state.pixel_height, vim.api.nvim_win_get_height(0) * 18, "pixel height")
+assert_equal(
+  vim.api.nvim_get_option_value("winhighlight", { win = 0 }),
+  "Normal:" .. buffer.transparent_highlight .. ",CursorLine:Visual",
+  "browser window must use a transparent Normal background and preserve mappings"
+)
+assert(vim.tbl_isempty(vim.api.nvim_get_hl(0, { name = buffer.transparent_highlight })),
+  "browser transparent highlight must not define a background")
+assert_equal(
+  vim.api.nvim_get_option_value("fillchars", { win = 0 }),
+  "vert:!,eob: ",
+  "browser window must hide end-of-buffer markers and preserve fill characters"
+)
 assert(count_messages("create") == 1, "create must be sent once")
 assert(count_messages("visibility") >= 1, "visibility must be sent")
 assert(count_messages("attach") == 1, "first attach must be sent")
@@ -136,6 +150,16 @@ assert_equal(vim.fn.getreg("0"), selected_text, "visual yank register zero")
 local other = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_win_set_buf(0, other)
 vim.wait(50)
+assert_equal(
+  vim.api.nvim_get_option_value("winhighlight", { win = 0 }),
+  "CursorLine:Visual",
+  "leaving the browser must restore the window highlight"
+)
+assert_equal(
+  vim.api.nvim_get_option_value("fillchars", { win = 0 }),
+  "vert:!,eob:~",
+  "leaving the browser must restore fill characters"
+)
 assert(count_messages("detach") >= 1, "buffer leave must detach placement")
 assert(browser._states()[state.bufnr] == state, "hidden state must be retained")
 

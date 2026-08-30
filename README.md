@@ -210,10 +210,13 @@ Link hints and visual selection are injected into each main-frame JavaScript
 context. Renderer-to-browser messages are accepted only for the expected
 browser, current main-frame URL, and active operation mode.
 
-The browser placement uses Kitty z-index `-1`, keeping Neovim text, floating
-window contents, and borders above the browser pixels. Floating-window
-background cells do not fully mask the image, so the page may remain visible
-behind otherwise empty areas of a float.
+The browser placement uses Kitty's minimum z-index while the browser window has
+a terminal-default background. Neovim text remains above the browser pixels,
+and floating windows with an explicit background can mask the page. Transparent
+or blended floats can still show page pixels through their background. Browser
+windows also replace the end-of-buffer `~` marker with a blank cell; the prior
+window highlight and fill-character settings are restored when the buffer
+leaves the window.
 
 CEF's Linux sandbox is enabled by default. `BROWSER_NO_SANDBOX=1` exists only
 as an explicit diagnostic escape hatch and should not be used for normal web

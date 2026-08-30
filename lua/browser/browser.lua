@@ -171,7 +171,7 @@ local function on_buf_win_enter(bufnr)
 
   state.winid = winid
   state.visible = true
-  buffer.configure_window(winid)
+  buffer.configure_window(winid, state)
   send_resize(state, true)
   ipc.send({ type = "visibility", browser_id = state.browser_id, visible = true })
   ipc.send({ type = "focus", browser_id = state.browser_id, focused = winid == vim.api.nvim_get_current_win() })
@@ -212,6 +212,7 @@ local function on_buf_win_leave(bufnr)
   state.attach_generation = -1
   ipc.send({ type = "focus", browser_id = state.browser_id, focused = false })
   ipc.send({ type = "detach", browser_id = state.browser_id })
+  buffer.restore_window(state)
   state.visible = false
   state.winid = nil
 end
@@ -222,6 +223,7 @@ local function destroy(bufnr)
     return
   end
   cancel_ephemeral_mode(state)
+  buffer.restore_window(state)
   state.destroyed = true
   ipc.send({ type = "destroy", browser_id = state.browser_id })
   states_by_buf[bufnr] = nil
@@ -433,6 +435,7 @@ function M.setup()
       for _, state in pairs(states_by_buf) do
         if state.winid == winid then
           cancel_ephemeral_mode(state)
+          buffer.restore_window(state)
           state.attach_generation = -1
           state.winid = nil
           state.visible = false
@@ -442,6 +445,10 @@ function M.setup()
         end
       end
     end,
+  })
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = augroup,
+    callback = buffer.ensure_transparent_highlight,
   })
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = augroup,
