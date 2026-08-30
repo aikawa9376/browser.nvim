@@ -139,6 +139,12 @@ bool App::Handle(const JsonValue& message) {
     }
     return true;
   }
+  if (*type == "set_masks") {
+    if (!manager_.SetMasks(message, &error)) {
+      Error(error, state->browser_id);
+    }
+    return true;
+  }
   if (*type == "navigate") {
     const auto url = message.String("url");
     if (!url || url->empty()) {

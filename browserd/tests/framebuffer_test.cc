@@ -62,6 +62,27 @@ int main() {
   assert(dirty.composited()[4] == 3);
   assert(dirty.composited()[20] == 0);
 
+  const std::array<browser::PixelRect, 1> masks = {{{1, 0, 1, 2}}};
+  const auto masked_regions = dirty.SetMasks(masks, 3, 2);
+  assert(masked_regions.size() == 1);
+  assert(dirty.masks().size() == 1);
+  assert(dirty.composited()[4] == 0 && dirty.composited()[7] == 0);
+  assert(dirty.composited()[16] == 0 && dirty.composited()[19] == 0);
+  const std::array<browser::PixelRect, 0> no_masks = {};
+  const auto restored_regions = dirty.SetMasks(no_masks, 3, 2);
+  assert(restored_regions.size() == 1);
+  assert(dirty.masks().empty());
+  assert(dirty.composited()[4] == 3 && dirty.composited()[7] == 4);
+  assert(dirty.composited()[16] == 7 && dirty.composited()[19] == 8);
+  const std::array<browser::PixelRect, 2> diagonal_masks = {
+      browser::PixelRect{0, 0, 1, 1}, browser::PixelRect{1, 1, 1, 1}};
+  dirty.SetMasks(diagonal_masks, 3, 2);
+  assert(dirty.masks().size() == 2);
+  assert(dirty.composited()[3] == 0);
+  assert(dirty.composited()[4] == 3);
+  assert(dirty.composited()[19] == 0);
+  dirty.SetMasks(no_masks, 3, 2);
+
   const browser::PixelRect clipped =
       browser::ClipPixelRect({-5, 1, 8, 4}, 10, 3);
   assert(clipped.x == 0 && clipped.y == 1 && clipped.width == 3 &&

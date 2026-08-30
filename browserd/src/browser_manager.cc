@@ -1,9 +1,59 @@
 #include "browser_manager.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <utility>
 
 namespace browser {
+namespace {
+
+bool ReadMasks(const JsonValue& message,
+               int width,
+               int height,
+               std::vector<PixelRect>* masks,
+               std::string* error) {
+  const JsonValue* value = message.Find("rects");
+  if (!value || value->type() != JsonValue::Type::kArray ||
+      value->array().size() > 256) {
+    if (error) {
+      *error = "rects must be an array with at most 256 entries";
+    }
+    return false;
+  }
+  masks->clear();
+  masks->reserve(value->array().size());
+  for (const JsonValue& entry : value->array()) {
+    if (!entry.is_object()) {
+      if (error) {
+        *error = "mask rectangles must be objects";
+      }
+      return false;
+    }
+    const auto x = entry.Integer("x");
+    const auto y = entry.Integer("y");
+    const auto rect_width = entry.Integer("width");
+    const auto rect_height = entry.Integer("height");
+    if (!x || !y || !rect_width || !rect_height || *x < 0 || *y < 0 ||
+        *x > 16384 || *y > 16384 || *rect_width < 1 || *rect_height < 1 ||
+        *rect_width > 16384 || *rect_height > 16384) {
+      if (error) {
+        *error = "mask rectangles require bounded x, y, width, and height";
+      }
+      return false;
+    }
+    const PixelRect rect = ClipPixelRect(
+        {static_cast<int>(*x), static_cast<int>(*y),
+         static_cast<int>(*rect_width), static_cast<int>(*rect_height)},
+        width, height);
+    if (rect.width > 0 && rect.height > 0) {
+      masks->push_back(rect);
+    }
+  }
+  return true;
+}
+
+}  // namespace
 
 BrowserManager::~BrowserManager() { DestroyAll(); }
 
@@ -41,11 +91,6 @@ bool BrowserManager::ReadPositiveInt(const JsonValue& message,
 bool BrowserManager::UploadFullFrame(BrowserState* state,
                                      bool refresh_anchor,
                                      std::string* error) {
-  if (refresh_anchor &&
-      !renderer_->UploadAnchor(state->browser_id, state->anchor_image_id,
-                               state->anchor_placement_id, error)) {
-    return false;
-  }
   state->pixels = KittyRenderer::Gradient(state->width, state->height);
   if (state->pixels.empty()) {
     if (error) {
@@ -53,8 +98,35 @@ bool BrowserManager::UploadFullFrame(BrowserState* state,
     }
     return false;
   }
+  return UploadPixels(state, refresh_anchor, error);
+}
+
+bool BrowserManager::UploadPixels(BrowserState* state,
+                                  bool refresh_anchor,
+                                  std::string* error) {
+  if (refresh_anchor &&
+      !renderer_->UploadAnchor(state->browser_id, state->anchor_image_id,
+                               state->anchor_placement_id, error)) {
+    return false;
+  }
+  std::vector<std::uint8_t> display = state->pixels;
+  for (const PixelRect requested : state->masks) {
+    const PixelRect rect =
+        ClipPixelRect(requested, state->width, state->height);
+    for (int y = rect.y; y < rect.y + rect.height; ++y) {
+      for (int x = rect.x; x < rect.x + rect.width; ++x) {
+        const std::size_t offset =
+            (static_cast<std::size_t>(y) *
+                 static_cast<std::size_t>(state->width) +
+             static_cast<std::size_t>(x)) *
+            4;
+        std::fill_n(
+            display.begin() + static_cast<std::ptrdiff_t>(offset), 4, 0);
+      }
+    }
+  }
   return renderer_->UploadRgba(state->browser_id, state->browser_image_id,
-                               state->width, state->height, state->pixels,
+                               state->width, state->height, display,
                                error);
 }
 
@@ -147,6 +219,35 @@ bool BrowserManager::Resize(const JsonValue& message, std::string* error) {
         state->rows, error);
   }
   return true;
+}
+
+bool BrowserManager::SetMasks(const JsonValue& message, std::string* error) {
+  std::uint32_t browser_id = 0;
+  if (!ReadPositive(message, "browser_id", &browser_id, error)) {
+    return false;
+  }
+  BrowserState* state = Find(browser_id);
+  if (!state) {
+    if (error) {
+      *error = "unknown browser_id";
+    }
+    return false;
+  }
+  std::vector<PixelRect> masks;
+  if (!ReadMasks(message, state->width, state->height, &masks, error)) {
+    return false;
+  }
+  state->masks = std::move(masks);
+  if (!state->attached) {
+    return true;
+  }
+  if (!UploadPixels(state, false, error)) {
+    return false;
+  }
+  return renderer_->PlaceRelative(
+      state->browser_image_id, state->browser_placement_id,
+      state->anchor_image_id, state->anchor_placement_id, state->columns,
+      state->rows, error);
 }
 
 bool BrowserManager::Attach(const JsonValue& message, std::string* error) {

@@ -46,6 +46,18 @@ CEF visibility are separate states:
 browser and frees browser and anchor images. `shutdown` waits for
 `OnBeforeClose()` for all browsers before quitting CEF's message loop.
 
+Neovim floating windows are masked with browser-relative pixel rectangles:
+
+```json
+{"type":"set_masks","browser_id":1,"rects":[{"x":100,"y":40,"width":300,"height":120}]}
+```
+
+An empty `rects` array clears every mask. At most 256 rectangles are accepted;
+browserd clips them to the retained framebuffer. Masking changes only the
+display composition, not the stored CEF view or popup pixels. When a float
+moves or closes, the union of the old and new mask regions is refreshed from
+the latest retained frame.
+
 ## Browser control
 
 Navigation and viewport messages are `navigate`, `back`, `forward`, `reload`,
@@ -101,7 +113,8 @@ merged. More than `max_dirty_rects`, or a merged area above
 extracts only each converted region into POSIX shared memory and sends a Kitty
 root-frame edit at its pixel `x`/`y` position. Popup paint rectangles are
 translated into view coordinates and composited through the same retained
-framebuffer.
+framebuffer. Float masks are applied after popup composition, so browser-native
+popups cannot cover Neovim floating windows.
 
 ## Daemon events
 

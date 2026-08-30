@@ -64,6 +64,7 @@ class CefBrowserManager {
 
   bool Create(const JsonValue& message, std::string* error);
   bool Resize(const JsonValue& message, std::string* error);
+  bool SetMasks(const JsonValue& message, std::string* error);
   bool Attach(const JsonValue& message, std::string* error);
   bool Detach(std::uint32_t browser_id, std::string* error);
   bool Destroy(std::uint32_t browser_id, std::string* error);

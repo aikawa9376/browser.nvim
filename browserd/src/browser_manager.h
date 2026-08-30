@@ -1,5 +1,6 @@
 #pragma once
 
+#include "framebuffer.h"
 #include "json.h"
 #include "kitty_renderer.h"
 
@@ -28,6 +29,7 @@ struct BrowserState {
   bool focused = false;
   std::string mode = "normal";
   std::vector<std::uint8_t> pixels;
+  std::vector<PixelRect> masks;
 };
 
 class BrowserManager {
@@ -37,6 +39,7 @@ class BrowserManager {
 
   bool Create(const JsonValue& message, std::string* error);
   bool Resize(const JsonValue& message, std::string* error);
+  bool SetMasks(const JsonValue& message, std::string* error);
   bool Attach(const JsonValue& message, std::string* error);
   bool Detach(std::uint32_t browser_id, std::string* error);
   bool Destroy(std::uint32_t browser_id, std::string* error);
@@ -48,6 +51,9 @@ class BrowserManager {
  private:
   bool UploadFullFrame(BrowserState* state, bool refresh_anchor,
                        std::string* error);
+  bool UploadPixels(BrowserState* state,
+                    bool refresh_anchor,
+                    std::string* error);
   static bool ReadPositive(const JsonValue& message, std::string_view key,
                            std::uint32_t* output, std::string* error);
   static bool ReadPositiveInt(const JsonValue& message, std::string_view key,

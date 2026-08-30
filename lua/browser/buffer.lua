@@ -3,8 +3,6 @@ local util = require("browser.util")
 
 local M = {}
 
-M.transparent_highlight = "BrowserNvimTransparent"
-
 local buffer_options = {
   buftype = "nofile",
   bufhidden = "hide",
@@ -82,25 +80,6 @@ function M.rename(bufnr, url)
   end
 end
 
-local function transparent_winhighlight(value)
-  local items = {}
-  local replaced = false
-  for item in value:gmatch("[^,]+") do
-    if item:match("^Normal:") then
-      if not replaced then
-        items[#items + 1] = "Normal:" .. M.transparent_highlight
-        replaced = true
-      end
-    else
-      items[#items + 1] = item
-    end
-  end
-  if not replaced then
-    table.insert(items, 1, "Normal:" .. M.transparent_highlight)
-  end
-  return table.concat(items, ",")
-end
-
 local function hidden_eob_fillchars(value)
   local items = {}
   local replaced = false
@@ -120,10 +99,6 @@ local function hidden_eob_fillchars(value)
   return table.concat(items, ",")
 end
 
-function M.ensure_transparent_highlight()
-  vim.api.nvim_set_hl(0, M.transparent_highlight, { bg = "NONE" })
-end
-
 function M.configure_window(winid, state)
   if not vim.api.nvim_win_is_valid(winid) then
     return
@@ -131,27 +106,18 @@ function M.configure_window(winid, state)
   for option, value in pairs(window_options) do
     vim.api.nvim_set_option_value(option, value, { win = winid, scope = "local" })
   end
-  M.ensure_transparent_highlight()
   if state.window_style and state.window_style.winid ~= winid then
     M.restore_window(state)
   end
   if not state.window_style then
-    local winhighlight = vim.api.nvim_get_option_value("winhighlight", { win = winid })
     local fillchars = vim.api.nvim_get_option_value("fillchars", { win = winid })
     state.window_style = {
       winid = winid,
-      winhighlight = winhighlight,
-      applied_winhighlight = transparent_winhighlight(winhighlight),
       fillchars = fillchars,
       applied_fillchars = hidden_eob_fillchars(fillchars),
     }
   end
   if state.window_style.winid == winid then
-    vim.api.nvim_set_option_value(
-      "winhighlight",
-      state.window_style.applied_winhighlight,
-      { win = winid }
-    )
     vim.api.nvim_set_option_value(
       "fillchars",
       state.window_style.applied_fillchars,
@@ -165,7 +131,6 @@ function M.restore_window(state)
   local style = state.window_style
   state.window_style = nil
   if style and vim.api.nvim_win_is_valid(style.winid) then
-    vim.api.nvim_set_option_value("winhighlight", style.winhighlight, { win = style.winid })
     vim.api.nvim_set_option_value("fillchars", style.fillchars, { win = style.winid })
   end
 end

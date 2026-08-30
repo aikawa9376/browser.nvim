@@ -378,7 +378,7 @@ std::string KittyRenderer::RelativePlacementControl(
   control << "a=p,i=" << image_id << ",p=" << placement_id
           << ",P=" << parent_image_id << ",Q=" << parent_placement_id
           << ",H=0,V=0,c=" << columns << ",r=" << rows
-          << ",z=-2147483648,C=1,q=2";
+          << ",z=-1,C=1,q=2";
   return control.str();
 }
 
