@@ -121,11 +121,6 @@ wait_for_event 'queued 600px scroll' '"type":"title_changed"' '"title":"browser.
 reset_events
 
 printf '%s\n' \
-  '{"type":"set_masks","browser_id":1,"rects":[{"x":20,"y":20,"width":100,"height":60}]}' \
-  '{"type":"set_masks","browser_id":1,"rects":[]}' \
-  >&"$daemon_input"
-
-printf '%s\n' \
   '{"type":"detach","browser_id":1}' \
   '{"type":"visibility","browser_id":1,"visible":false}' \
   '{"type":"visibility","browser_id":1,"visible":true}' \

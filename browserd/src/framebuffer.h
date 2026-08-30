@@ -56,9 +56,6 @@ class Framebuffer {
   bool Extract(PixelRect rect,
                std::vector<std::uint8_t>* rgba,
                std::string* error) const;
-  std::vector<PixelRect> SetMasks(std::span<const PixelRect> masks,
-                                  int width,
-                                  int height);
   void SetPopupRect(PixelRect rect);
   void SetPopupVisible(bool visible);
 
@@ -69,7 +66,6 @@ class Framebuffer {
   [[nodiscard]] int popup_height() const { return popup_height_; }
   [[nodiscard]] bool popup_visible() const { return popup_visible_; }
   [[nodiscard]] PixelRect popup_rect() const { return popup_rect_; }
-  [[nodiscard]] std::span<const PixelRect> masks() const { return masks_; }
   [[nodiscard]] std::span<const std::uint8_t> composited() const {
     return composited_rgba_;
   }
@@ -86,7 +82,6 @@ class Framebuffer {
   std::vector<std::uint8_t> view_rgba_;
   std::vector<std::uint8_t> popup_rgba_;
   std::vector<std::uint8_t> composited_rgba_;
-  std::vector<PixelRect> masks_;
 };
 
 }  // namespace browser

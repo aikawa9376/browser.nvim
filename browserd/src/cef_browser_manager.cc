@@ -54,51 +54,6 @@ bool PrepareDirtyRects(const CefBrowserState& state,
          viewport_area * state.full_frame_threshold;
 }
 
-bool ReadMasks(const JsonValue& message,
-               int width,
-               int height,
-               std::vector<PixelRect>* masks,
-               std::string* error) {
-  const JsonValue* value = message.Find("rects");
-  if (!value || value->type() != JsonValue::Type::kArray ||
-      value->array().size() > 256) {
-    if (error) {
-      *error = "rects must be an array with at most 256 entries";
-    }
-    return false;
-  }
-  masks->clear();
-  masks->reserve(value->array().size());
-  for (const JsonValue& entry : value->array()) {
-    if (!entry.is_object()) {
-      if (error) {
-        *error = "mask rectangles must be objects";
-      }
-      return false;
-    }
-    const auto x = entry.Integer("x");
-    const auto y = entry.Integer("y");
-    const auto rect_width = entry.Integer("width");
-    const auto rect_height = entry.Integer("height");
-    if (!x || !y || !rect_width || !rect_height || *x < 0 || *y < 0 ||
-        *x > 16384 || *y > 16384 || *rect_width < 1 ||
-        *rect_height < 1 || *rect_width > 16384 || *rect_height > 16384) {
-      if (error) {
-        *error = "mask rectangles require bounded x, y, width, and height";
-      }
-      return false;
-    }
-    const PixelRect rect = ClipPixelRect(
-        {static_cast<int>(*x), static_cast<int>(*y),
-         static_cast<int>(*rect_width), static_cast<int>(*rect_height)},
-        width, height);
-    if (rect.width > 0 && rect.height > 0) {
-      masks->push_back(rect);
-    }
-  }
-  return true;
-}
-
 }  // namespace
 
 CefBrowserManager::~CefBrowserManager() {
@@ -283,28 +238,6 @@ bool CefBrowserManager::Resize(const JsonValue& message, std::string* error) {
         state->rows, error);
   }
   return true;
-}
-
-bool CefBrowserManager::SetMasks(const JsonValue& message, std::string* error) {
-  CEF_REQUIRE_UI_THREAD();
-  std::uint32_t browser_id = 0;
-  if (!ReadPositive(message, "browser_id", &browser_id, error)) {
-    return false;
-  }
-  CefBrowserState* state = Find(browser_id);
-  if (!state || state->destroying) {
-    if (error) {
-      *error = "unknown browser_id";
-    }
-    return false;
-  }
-  std::vector<PixelRect> masks;
-  if (!ReadMasks(message, state->width, state->height, &masks, error)) {
-    return false;
-  }
-  const std::vector<PixelRect> affected =
-      state->framebuffer.SetMasks(masks, state->width, state->height);
-  return RenderRegions(state, affected, error);
 }
 
 bool CefBrowserManager::Attach(const JsonValue& message, std::string* error) {

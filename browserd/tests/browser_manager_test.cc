@@ -49,20 +49,6 @@ int main() {
   assert(manager.Attach(browser::JsonValue(std::move(attach)), &error));
   assert(manager.Find(1)->attached);
 
-  browser::JsonValue::Array mask_rects;
-  browser::JsonValue::Object mask_rect;
-  mask_rect.emplace("x", 10);
-  mask_rect.emplace("y", 20);
-  mask_rect.emplace("width", 30);
-  mask_rect.emplace("height", 40);
-  mask_rects.emplace_back(std::move(mask_rect));
-  browser::JsonValue::Object masks;
-  masks.emplace("type", "set_masks");
-  masks.emplace("browser_id", 1);
-  masks.emplace("rects", std::move(mask_rects));
-  assert(manager.SetMasks(browser::JsonValue(std::move(masks)), &error));
-  assert(manager.Find(1)->masks.size() == 1);
-
   browser::JsonValue::Object resize;
   resize.emplace("type", "resize");
   resize.emplace("browser_id", 1);

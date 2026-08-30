@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <limits>
-#include <utility>
 
 namespace browser {
 namespace {
@@ -230,25 +229,6 @@ bool Framebuffer::Extract(PixelRect requested,
   return true;
 }
 
-std::vector<PixelRect> Framebuffer::SetMasks(
-    std::span<const PixelRect> masks,
-    int width,
-    int height) {
-  std::vector<PixelRect> affected = masks_;
-  std::vector<PixelRect> clipped;
-  clipped.reserve(masks.size());
-  for (const PixelRect requested : masks) {
-    const PixelRect rect = ClipPixelRect(requested, width, height);
-    if (rect.width > 0 && rect.height > 0) {
-      clipped.push_back(rect);
-      affected.push_back(rect);
-    }
-  }
-  masks_ = std::move(clipped);
-  Compose();
-  return MergePixelRects(affected);
-}
-
 void Framebuffer::SetPopupRect(PixelRect rect) {
   popup_rect_ = rect;
   Compose();
@@ -261,50 +241,35 @@ void Framebuffer::SetPopupVisible(bool visible) {
 
 void Framebuffer::Compose() {
   composited_rgba_ = view_rgba_;
-  if (popup_visible_ && !composited_rgba_.empty() && !popup_rgba_.empty() &&
-      popup_width_ > 0 && popup_height_ > 0) {
-    const int copy_width = std::min(popup_width_, popup_rect_.width);
-    const int copy_height = std::min(popup_height_, popup_rect_.height);
-    for (int popup_y = 0; popup_y < copy_height; ++popup_y) {
-      const int view_y = popup_rect_.y + popup_y;
-      if (view_y < 0 || view_y >= height_) {
-        continue;
-      }
-      for (int popup_x = 0; popup_x < copy_width; ++popup_x) {
-        const int view_x = popup_rect_.x + popup_x;
-        if (view_x < 0 || view_x >= width_) {
-          continue;
-        }
-        const std::size_t source =
-            (static_cast<std::size_t>(popup_y) *
-                 static_cast<std::size_t>(popup_width_) +
-             static_cast<std::size_t>(popup_x)) *
-            4;
-        const std::size_t destination =
-            (static_cast<std::size_t>(view_y) *
-                 static_cast<std::size_t>(width_) +
-             static_cast<std::size_t>(view_x)) *
-            4;
-        std::copy_n(popup_rgba_.begin() + static_cast<std::ptrdiff_t>(source),
-                    4,
-                    composited_rgba_.begin() +
-                        static_cast<std::ptrdiff_t>(destination));
-      }
-    }
+  if (!popup_visible_ || composited_rgba_.empty() || popup_rgba_.empty() ||
+      popup_width_ < 1 || popup_height_ < 1) {
+    return;
   }
 
-  for (const PixelRect requested : masks_) {
-    const PixelRect rect = ClipPixelRect(requested, width_, height_);
-    for (int y = rect.y; y < rect.y + rect.height; ++y) {
-      for (int x = rect.x; x < rect.x + rect.width; ++x) {
-        const std::size_t offset =
-            (static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) +
-             static_cast<std::size_t>(x)) *
-            4;
-        std::fill_n(composited_rgba_.begin() +
-                        static_cast<std::ptrdiff_t>(offset),
-                    4, 0);
+  const int copy_width = std::min(popup_width_, popup_rect_.width);
+  const int copy_height = std::min(popup_height_, popup_rect_.height);
+  for (int popup_y = 0; popup_y < copy_height; ++popup_y) {
+    const int view_y = popup_rect_.y + popup_y;
+    if (view_y < 0 || view_y >= height_) {
+      continue;
+    }
+    for (int popup_x = 0; popup_x < copy_width; ++popup_x) {
+      const int view_x = popup_rect_.x + popup_x;
+      if (view_x < 0 || view_x >= width_) {
+        continue;
       }
+      const std::size_t source =
+          (static_cast<std::size_t>(popup_y) *
+               static_cast<std::size_t>(popup_width_) +
+           static_cast<std::size_t>(popup_x)) *
+          4;
+      const std::size_t destination =
+          (static_cast<std::size_t>(view_y) * static_cast<std::size_t>(width_) +
+           static_cast<std::size_t>(view_x)) *
+          4;
+      std::copy_n(popup_rgba_.begin() + static_cast<std::ptrdiff_t>(source), 4,
+                  composited_rgba_.begin() +
+                      static_cast<std::ptrdiff_t>(destination));
     }
   }
 }

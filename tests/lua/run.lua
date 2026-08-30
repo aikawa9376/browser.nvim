@@ -47,15 +47,6 @@ local function count_messages(kind)
   return count
 end
 
-local function last_message(kind)
-  for index = #sent, 1, -1 do
-    if sent[index].type == kind then
-      return sent[index]
-    end
-  end
-end
-
-vim.api.nvim_set_option_value("winhighlight", "CursorLine:Visual", { win = 0 })
 vim.api.nvim_set_option_value("fillchars", "vert:!,eob:~", { scope = "global" })
 local state = assert(browser.open("example.com"))
 vim.wait(100, function()
@@ -73,11 +64,6 @@ assert_equal(vim.api.nvim_buf_get_lines(state.bufnr, 0, 1, false)[1], anchor.anc
 assert_equal(state.pixel_width, vim.api.nvim_win_get_width(0) * 9, "pixel width")
 assert_equal(state.pixel_height, vim.api.nvim_win_get_height(0) * 18, "pixel height")
 assert_equal(
-  vim.api.nvim_get_option_value("winhighlight", { win = 0 }),
-  "CursorLine:Visual",
-  "browser window must preserve window highlights"
-)
-assert_equal(
   vim.api.nvim_get_option_value("fillchars", { win = 0 }),
   "vert:!,eob: ",
   "browser window must hide end-of-buffer markers and preserve fill characters"
@@ -85,39 +71,6 @@ assert_equal(
 assert(count_messages("create") == 1, "create must be sent once")
 assert(count_messages("visibility") >= 1, "visibility must be sent")
 assert(count_messages("attach") == 1, "first attach must be sent")
-assert_equal(last_message("set_masks").rects, {}, "initial float mask set")
-
-local browser_position = vim.api.nvim_win_get_position(0)
-local float_buffer = vim.api.nvim_create_buf(false, true)
-local float_width = 10
-local float_height = 3
-local masks_before_float = count_messages("set_masks")
-local float_window = vim.api.nvim_open_win(float_buffer, false, {
-  relative = "editor",
-  row = browser_position[1] + 1,
-  col = browser_position[2] + 2,
-  width = float_width,
-  height = float_height,
-  border = "single",
-  noautocmd = true,
-})
-assert(vim.wait(500, function()
-  return count_messages("set_masks") > masks_before_float
-end), "float mask polling must detect noautocmd windows")
-assert_equal(last_message("set_masks").rects, {
-  {
-    x = 2 * 9,
-    y = 1 * 18,
-    width = (float_width + 2) * 9,
-    height = (float_height + 2) * 18,
-  },
-}, "bordered float must mask its browser intersection")
-local masks_before_close = count_messages("set_masks")
-vim.api.nvim_win_close(float_window, true)
-assert(vim.wait(500, function()
-  return count_messages("set_masks") > masks_before_close
-end), "float mask polling must detect closed windows")
-assert_equal(last_message("set_masks").rects, {}, "closing a float must clear its mask")
 
 local function feed(keys)
   local encoded = vim.api.nvim_replace_termcodes(keys, true, false, true)
@@ -189,11 +142,6 @@ assert_equal(vim.fn.getreg("0"), selected_text, "visual yank register zero")
 local other = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_win_set_buf(0, other)
 vim.wait(50)
-assert_equal(
-  vim.api.nvim_get_option_value("winhighlight", { win = 0 }),
-  "CursorLine:Visual",
-  "leaving the browser must restore the window highlight"
-)
 assert_equal(
   vim.api.nvim_get_option_value("fillchars", { win = 0 }),
   "vert:!,eob:~",

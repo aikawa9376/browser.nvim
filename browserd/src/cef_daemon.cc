@@ -181,12 +181,6 @@ void CefDaemon::Handle(JsonValue message) {
     }
     return;
   }
-  if (*type == "set_masks") {
-    if (!manager_.SetMasks(message, &error)) {
-      Error(error, browser_id);
-    }
-    return;
-  }
   if (*type == "navigate") {
     const auto url = message.String("url");
     if (!url || url->empty()) {

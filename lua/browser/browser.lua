@@ -12,8 +12,6 @@ local states_by_id = {}
 local augroup
 local id_cursor = 0
 local attach_generation = 0
-local mask_update_pending = false
-local mask_timer
 
 local seed = tostring(vim.fn.getpid()) .. ":" .. tostring(vim.uv.hrtime())
 local session_base = (tonumber(vim.fn.sha256(seed):sub(1, 6), 16) % 0xff0000) + 1
@@ -110,125 +108,6 @@ local function send_resize(state, force)
   end
 end
 
-local function has_border(config_value)
-  return type(config_value.border) == "table" and #config_value.border > 0
-end
-
-local function float_masks(state)
-  if not state.winid or not vim.api.nvim_win_is_valid(state.winid) then
-    return {}
-  end
-  if vim.api.nvim_win_get_buf(state.winid) ~= state.bufnr then
-    return {}
-  end
-
-  local browser_position = vim.api.nvim_win_get_position(state.winid)
-  local browser_top = browser_position[1]
-  local browser_left = browser_position[2]
-  local browser_bottom = browser_top + vim.api.nvim_win_get_height(state.winid)
-  local browser_right = browser_left + vim.api.nvim_win_get_width(state.winid)
-  local cell_width, cell_height = cell_size()
-  local masks = {}
-
-  for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    if winid ~= state.winid and vim.api.nvim_win_is_valid(winid) then
-      local float_config = vim.api.nvim_win_get_config(winid)
-      if float_config.relative ~= "" and not float_config.external and not float_config.hide then
-        local position = vim.api.nvim_win_get_position(winid)
-        local border = has_border(float_config) and 2 or 0
-        local float_top = position[1]
-        local float_left = position[2]
-        local float_bottom = float_top + vim.api.nvim_win_get_height(winid) + border
-        local float_right = float_left + vim.api.nvim_win_get_width(winid) + border
-        local top = math.max(browser_top, float_top)
-        local left = math.max(browser_left, float_left)
-        local bottom = math.min(browser_bottom, float_bottom)
-        local right = math.min(browser_right, float_right)
-        if top < bottom and left < right then
-          masks[#masks + 1] = {
-            x = (left - browser_left) * cell_width,
-            y = (top - browser_top) * cell_height,
-            width = (right - left) * cell_width,
-            height = (bottom - top) * cell_height,
-          }
-        end
-      end
-    end
-  end
-
-  table.sort(masks, function(left, right)
-    if left.y ~= right.y then
-      return left.y < right.y
-    end
-    if left.x ~= right.x then
-      return left.x < right.x
-    end
-    if left.height ~= right.height then
-      return left.height < right.height
-    end
-    return left.width < right.width
-  end)
-  return masks
-end
-
-local function update_float_masks(state, force)
-  if not state.visible or state.crashed then
-    return
-  end
-  local masks = float_masks(state)
-  if not force and vim.deep_equal(masks, state.float_masks or {}) then
-    return
-  end
-  state.float_masks = masks
-  ipc.send({ type = "set_masks", browser_id = state.browser_id, rects = masks })
-end
-
-local function update_all_float_masks()
-  mask_update_pending = false
-  for _, state in pairs(states_by_buf) do
-    update_float_masks(state, false)
-  end
-end
-
-local function schedule_float_mask_update()
-  if mask_update_pending then
-    return
-  end
-  mask_update_pending = true
-  vim.schedule(update_all_float_masks)
-end
-
-local function has_visible_browser()
-  for _, state in pairs(states_by_buf) do
-    if state.visible and not state.crashed then
-      return true
-    end
-  end
-  return false
-end
-
-local function stop_mask_timer()
-  if mask_timer then
-    mask_timer:stop()
-    mask_timer:close()
-    mask_timer = nil
-  end
-end
-
-local function sync_mask_timer()
-  if has_visible_browser() then
-    if mask_timer then
-      return
-    end
-    mask_timer = vim.uv.new_timer()
-    mask_timer:start(50, 50, function()
-      vim.schedule(schedule_float_mask_update)
-    end)
-  else
-    stop_mask_timer()
-  end
-end
-
 local function state_for_current()
   return states_by_buf[vim.api.nvim_get_current_buf()]
 end
@@ -292,10 +171,8 @@ local function on_buf_win_enter(bufnr)
 
   state.winid = winid
   state.visible = true
-  sync_mask_timer()
   buffer.configure_window(winid, state)
   send_resize(state, true)
-  update_float_masks(state, true)
   ipc.send({ type = "visibility", browser_id = state.browser_id, visible = true })
   ipc.send({ type = "focus", browser_id = state.browser_id, focused = winid == vim.api.nvim_get_current_win() })
 
@@ -338,7 +215,6 @@ local function on_buf_win_leave(bufnr)
   buffer.restore_window(state)
   state.visible = false
   state.winid = nil
-  sync_mask_timer()
 end
 
 local function destroy(bufnr)
@@ -352,7 +228,6 @@ local function destroy(bufnr)
   ipc.send({ type = "destroy", browser_id = state.browser_id })
   states_by_buf[bufnr] = nil
   states_by_id[state.browser_id] = nil
-  sync_mask_timer()
 end
 
 local function on_event(event)
@@ -441,7 +316,6 @@ local function on_exit(completed, expected, stderr)
       detail,
     })
   end
-  sync_mask_timer()
   util.notify(
     ("browserd exited (code=%s, signal=%s)"):format(completed.code, completed.signal),
     vim.log.levels.ERROR
@@ -471,7 +345,6 @@ function M.setup()
       if state then
         state.visible = false
         ipc.send({ type = "visibility", browser_id = state.browser_id, visible = false })
-        sync_mask_timer()
       end
     end,
   })
@@ -511,7 +384,6 @@ function M.setup()
       for _, state in pairs(states_by_buf) do
         send_resize(state, false)
       end
-      schedule_float_mask_update()
     end,
   })
   vim.api.nvim_create_autocmd("WinScrolled", {
@@ -524,7 +396,6 @@ function M.setup()
           buffer.pin_view(winid)
         end
       end
-      schedule_float_mask_update()
     end,
   })
   vim.api.nvim_create_autocmd("WinEnter", {
@@ -546,7 +417,6 @@ function M.setup()
         end
         ipc.send({ type = "focus", browser_id = state.browser_id, focused = true })
       end
-      schedule_float_mask_update()
     end,
   })
   vim.api.nvim_create_autocmd("WinLeave", {
@@ -556,7 +426,6 @@ function M.setup()
       if state then
         ipc.send({ type = "focus", browser_id = state.browser_id, focused = false })
       end
-      schedule_float_mask_update()
     end,
   })
   vim.api.nvim_create_autocmd("WinClosed", {
@@ -575,22 +444,11 @@ function M.setup()
           ipc.send({ type = "visibility", browser_id = state.browser_id, visible = false })
         end
       end
-      sync_mask_timer()
-      schedule_float_mask_update()
     end,
-  })
-  vim.api.nvim_create_autocmd("WinNew", {
-    group = augroup,
-    callback = schedule_float_mask_update,
-  })
-  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-    group = augroup,
-    callback = schedule_float_mask_update,
   })
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = augroup,
     callback = function()
-      stop_mask_timer()
       ipc.shutdown()
     end,
   })
@@ -764,7 +622,6 @@ function M.restart_daemon()
   end
   for _, state in pairs(states_by_buf) do
     state.crashed = false
-    state.float_masks = nil
     set_mode(state, "normal")
     state.winid = nil
     buffer.restore_anchor(state.bufnr, state)

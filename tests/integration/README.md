@@ -24,22 +24,19 @@ or `all` before starting Neovim.
 7. Move the browser buffer to another tab and return.
 8. Attempt to show the same browser buffer in two windows. The second window
    must show the single-window restriction message, never a second surface.
-9. Open a bordered Neovim floating window over the browser. Its full rectangle
-   must remain visible without hiding the rest of the page; moving or closing
-   it must restore the current browser pixels without a stale patch.
-10. Run `:bdelete` on the browser buffer. Both anchor and browser resources must
+9. Run `:bdelete` on the browser buffer. Both anchor and browser resources must
    disappear.
-11. Open `links.html`, press `f`, and activate both a link and a form target
+10. Open `links.html`, press `f`, and activate both a link and a form target
     without using a mouse. `Esc` must remove an unfinished hint overlay.
-12. On `forms.html`, select the input hint, enter Japanese and emoji text, use
+11. On `forms.html`, select the input hint, enter Japanese and emoji text, use
     editing keys, and return to Browser Normal Mode with `Esc`.
-13. On `selection.html`, press `v`, choose a text hint, move with
+12. On `selection.html`, press `v`, choose a text hint, move with
     `h/l/w/b/j/k/0/$/o`, and press `y`. Verify the result with `:registers`.
-14. Repeat visual selection on `graphemes.html`; family emoji, combining text,
+13. Repeat visual selection on `graphemes.html`; family emoji, combining text,
     and Japanese graphemes must not be split.
-15. Open `popup.html` and exercise a select popup, then open `animation.html`.
+14. Open `popup.html` and exercise a select popup, then open `animation.html`.
     Popup pixels and animated dirty updates must remain inside the surface.
-16. Repeat once directly in Kitty and once through Kitty → tmux → Neovim.
+15. Repeat once directly in Kitty and once through Kitty → tmux → Neovim.
 
 When `DISPLAY` is available, CTest also runs
 `tests/integration/cef-smoke.sh`. It disables Kitty writes only for the test,
