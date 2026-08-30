@@ -71,8 +71,14 @@ the same movement operations as Visual Mode except `swap`, and
 
 ```json
 {"type":"cursor_move","browser_id":1,"operation":"next_word"}
+{"type":"cursor_activate","browser_id":1}
 {"type":"visual_cursor_start","browser_id":1}
 ```
+
+`cursor_activate` clicks the actionable ancestor under the cursor. Text links
+and buttons are activated from their text position; controls without rendered
+text are represented as atomic cursor stops. If no actionable target exists,
+the daemon emits `cursor_activate_unavailable`.
 
 DOM Visual Mode then uses `visual_move`, `visual_yank`, and `visual_cancel`.
 Move operations are

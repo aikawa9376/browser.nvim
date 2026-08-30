@@ -602,6 +602,26 @@ bool CefBrowserManager::NormalMove(std::uint32_t browser_id,
   return true;
 }
 
+bool CefBrowserManager::ActivateAtCursor(std::uint32_t browser_id,
+                                         std::string* error) {
+  CEF_REQUIRE_UI_THREAD();
+  CefBrowserState* state = Find(browser_id);
+  if (!state || state->destroying) {
+    if (error) {
+      *error = "unknown browser_id";
+    }
+    return false;
+  }
+  if (!state->browser || !state->page_ready || state->mode != "normal") {
+    if (error) {
+      *error = "cursor_activate requires a ready page in normal mode";
+    }
+    return false;
+  }
+  ExecuteScript(state, "window.__nvimBrowser.visual.activateCursor();");
+  return true;
+}
+
 bool CefBrowserManager::StartVisualAtCursor(std::uint32_t browser_id,
                                             std::string* error) {
   CEF_REQUIRE_UI_THREAD();
@@ -1071,6 +1091,12 @@ bool CefBrowserManager::HandleBridgeQuery(std::uint32_t browser_id,
       return false;
     }
     sink_->Emit(JsonValue(Event("cursor_input_unavailable", browser_id)));
+  } else if (*kind == "cursor_activate_unavailable") {
+    if (state->mode != "normal") {
+      *error = "cursor activation result received outside normal mode";
+      return false;
+    }
+    sink_->Emit(JsonValue(Event("cursor_activate_unavailable", browser_id)));
   } else {
     *error = "unsupported bridge event";
     return false;

@@ -247,6 +247,12 @@ void CefDaemon::Handle(JsonValue message) {
     }
     return;
   }
+  if (*type == "cursor_activate") {
+    if (!manager_.ActivateAtCursor(browser_id, &error)) {
+      Error(error, browser_id);
+    }
+    return;
+  }
   if (*type == "visual_cursor_start") {
     if (!manager_.StartVisualAtCursor(browser_id, &error)) {
       Error(error, browser_id);

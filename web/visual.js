@@ -83,6 +83,31 @@
           (!visibleOnly || visibleRectangle(rect));
       });
 
+  const actionableElements = (visibleOnly = false) =>
+    Array.from(document.querySelectorAll(
+      "a[href],button,summary,[role='button'],[role='link']," +
+      "input[type='button'],input[type='submit'],input[type='reset']",
+    )).filter((element) => {
+      if (!(element instanceof HTMLElement) || element.matches(":disabled")) {
+        return false;
+      }
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" &&
+        Number.parseFloat(style.opacity) !== 0 && rect.width > 0 && rect.height > 0 &&
+        (!visibleOnly || visibleRectangle(rect));
+    });
+
+  const hasCursorText = (element) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!excludedParent(node) && node.data.trim() && nodeRectangles(node).length > 0) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const positionOrder = (left, right) => {
     if (left.node === right.node) {
       return Math.sign(left.offset - right.offset);
@@ -291,16 +316,26 @@
         break;
       }
     }
+    const elements = new Set();
     for (const element of editableElements(visibleOnly)) {
-      const position = { node: element, offset: 0, editable: true };
-      positions.push({ position, rect: element.getBoundingClientRect() });
+      if (!hasCursorText(element)) {
+        elements.add(element);
+        const position = { node: element, offset: 0, element: true, editable: true };
+        positions.push({ position, rect: element.getBoundingClientRect() });
+      }
+    }
+    for (const element of actionableElements(visibleOnly)) {
+      if (!elements.has(element) && !hasCursorText(element)) {
+        const position = { node: element, offset: 0, element: true, actionable: true };
+        positions.push({ position, rect: element.getBoundingClientRect() });
+      }
     }
     positions.sort((left, right) => positionOrder(left.position, right.position));
     return positions;
   };
 
   const cursorRectangle = (position) => {
-    if (position.editable) {
+    if (position.element) {
       return position.node.getBoundingClientRect();
     }
     const next = nextGrapheme(position, 1);
@@ -328,9 +363,9 @@
       position: "fixed",
       pointerEvents: "none",
       zIndex: "2147483647",
-      background: "#fff",
-      mixBlendMode: "difference",
-      opacity: "0.82",
+      boxSizing: "border-box",
+      boxShadow: "0 0 0 1px rgba(0,0,0,.75)",
+      opacity: "1",
     });
     document.documentElement.append(cursorMarker);
     return cursorMarker;
@@ -345,7 +380,7 @@
     return candidates[0]?.position || null;
   };
 
-  const renderCursor = () => {
+  const renderCursor = (rehome = true) => {
     if (!normalMode) {
       if (cursorMarker) {
         cursorMarker.style.display = "none";
@@ -361,6 +396,12 @@
     }
     let rect = cursorRectangle(cursorState.focus);
     if (!visibleRectangle(rect)) {
+      if (!rehome) {
+        if (cursorMarker) {
+          cursorMarker.style.display = "none";
+        }
+        return;
+      }
       const position = initialCursorPosition();
       if (!position) {
         return;
@@ -370,16 +411,33 @@
     }
     const marker = ensureCursorMarker();
     const editable = Boolean(cursorState.focus.editable);
+    const actionable = Boolean(cursorState.focus.actionable);
+    const element = editable || actionable;
+    const color = actionable ? "#22d3ee" : "#facc15";
     Object.assign(marker.style, {
       display: "block",
       left: `${Math.max(0, rect.left)}px`,
       top: `${Math.max(0, rect.top)}px`,
-      width: `${Math.max(editable ? 4 : 2, rect.width)}px`,
+      width: `${Math.max(element ? 4 : 2, rect.width)}px`,
       height: `${Math.max(2, rect.height)}px`,
-      background: editable ? "transparent" : "#fff",
-      outline: editable ? "2px solid #fff" : "none",
-      outlineOffset: editable ? "-2px" : "0",
+      background: element ? `${color}33` : "rgba(250,204,21,.58)",
+      outline: `2px solid ${color}`,
+      outlineOffset: element ? "-2px" : "-1px",
     });
+  };
+
+  const revealCursor = () => {
+    if (!cursorState) {
+      return;
+    }
+    let rect = cursorRectangle(cursorState.focus);
+    if (rect.top < 8) {
+      scrollBy(0, rect.top - 12);
+    } else if (rect.bottom > innerHeight - 8) {
+      scrollBy(0, rect.bottom - innerHeight + 12);
+    }
+    rect = cursorRectangle(cursorState.focus);
+    renderCursor(false);
   };
 
   const scheduleCursorRefresh = () => {
@@ -545,21 +603,45 @@
       if (target) {
         cursorState.focus = target;
         cursorState.preferredX = null;
-        renderCursor();
+        revealCursor();
       }
     } else if (operation === "down" || operation === "up") {
-      verticalMove(
-        cursorState,
-        operation === "down" ? 1 : -1,
-        renderCursor,
-        () => normalPositions(false, true),
-      );
+      const direction = operation === "down" ? 1 : -1;
+      const current = caretRectangle(cursorState.focus);
+      if (cursorState.preferredX === null) {
+        cursorState.preferredX = current.left;
+      }
+      const currentCenter = current.top + current.height / 2;
+      const candidates = normalPositions(false, false).filter(({ position, rect }) => {
+        if (positionOrder(position, cursorState.focus) === 0) {
+          return false;
+        }
+        const center = rect.top + rect.height / 2;
+        return direction > 0 ? center > currentCenter + 1 : center < currentCenter - 1;
+      });
+      let lineDistance = Infinity;
+      for (const candidate of candidates) {
+        lineDistance = Math.min(lineDistance, Math.abs(
+          candidate.rect.top + candidate.rect.height / 2 - currentCenter,
+        ));
+      }
+      const tolerance = Math.max(2, current.height * 0.6);
+      const nextLine = candidates.filter(({ rect }) => Math.abs(
+        Math.abs(rect.top + rect.height / 2 - currentCenter) - lineDistance,
+      ) <= tolerance);
+      nextLine.sort((left, right) =>
+        Math.abs(left.rect.left - cursorState.preferredX) -
+        Math.abs(right.rect.left - cursorState.preferredX));
+      if (nextLine[0]) {
+        cursorState.focus = nextLine[0].position;
+        revealCursor();
+      }
     } else if (operation === "line_start" || operation === "line_end") {
       lineEdge(
         cursorState,
         operation === "line_end",
-        renderCursor,
-        () => normalPositions(false, true),
+        revealCursor,
+        () => normalPositions(false, false),
       );
     }
   };
@@ -675,7 +757,7 @@
       const position = initialCursorPosition();
       cursorState = position ? { focus: position, preferredX: null } : null;
     }
-    if (!cursorState || cursorState.focus.editable) {
+    if (!cursorState || cursorState.focus.element) {
       api.send({ kind: "visual_empty" });
       return;
     }
@@ -694,6 +776,10 @@
   };
 
   const focusCursorEditable = () => {
+    if (!cursorState || !cursorState.focus.node.isConnected) {
+      const position = initialCursorPosition();
+      cursorState = position ? { focus: position, preferredX: null } : null;
+    }
     let element = cursorState?.focus.editable ? cursorState.focus.node : null;
     const textParent = cursorState?.focus.node?.parentElement;
     if (!element && textParent) {
@@ -716,6 +802,26 @@
       selection.addRange(range);
     }
     api.send({ kind: "cursor_input_focused", tag: element.tagName.toLowerCase() });
+  };
+
+  const activateCursor = () => {
+    if (!cursorState || !cursorState.focus.node.isConnected) {
+      const position = initialCursorPosition();
+      cursorState = position ? { focus: position, preferredX: null } : null;
+    }
+    let element = cursorState?.focus.actionable ? cursorState.focus.node : null;
+    const textParent = cursorState?.focus.node?.parentElement;
+    if (!element && textParent) {
+      element = textParent.closest(
+        "a[href],button,summary,[role='button'],[role='link']," +
+        "input[type='button'],input[type='submit'],input[type='reset']",
+      );
+    }
+    if (!(element instanceof HTMLElement) || element.matches(":disabled")) {
+      api.send({ kind: "cursor_activate_unavailable" });
+      return;
+    }
+    element.click();
   };
 
   const hintInput = (key) => {
@@ -763,6 +869,7 @@
     hintInput,
     normalMove,
     focusCursorEditable,
+    activateCursor,
     setNormalMode,
     move,
     yank,

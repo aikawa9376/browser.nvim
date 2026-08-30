@@ -97,6 +97,9 @@ assert_equal(sent[#sent].type, "cursor_move", "h command")
 assert_equal(sent[#sent].operation, "previous_grapheme", "h cursor movement")
 
 state.ready = true
+feed("<CR>")
+assert_equal(sent[#sent].type, "cursor_activate", "enter must activate the DOM cursor target")
+
 feed("v")
 assert_equal(sent[#sent].type, "visual_cursor_start", "v must select from the normal cursor")
 assert_equal(state.mode, "visual", "v must enter browser visual mode")

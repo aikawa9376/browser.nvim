@@ -13,6 +13,7 @@ links_page=$4
 forms_page=$5
 selection_page=$6
 graphemes_page=$7
+cursor_page=$(dirname "$selection_page")/cursor.html
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/browser-cef-smoke.XXXXXX")
 events_file="$temporary_dir/events.jsonl"
 all_events_file="$temporary_dir/all-events.jsonl"
@@ -182,6 +183,18 @@ wait_for_event 'links page title' '"type":"title_changed"' '"title":"browser.nvi
 wait_for_event 'links page completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$links_page\""
 reset_events
 
+printf '%s\n' '{"type":"cursor_activate","browser_id":1}' >&"$daemon_input"
+wait_for_event 'normal cursor link activation' '"type":"title_changed"' '"title":"browser.nvim basic"'
+wait_for_event 'normal cursor link completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$page\""
+reset_events
+
+printf '%s\n' \
+  "{\"type\":\"navigate\",\"browser_id\":1,\"url\":\"file://$links_page\"}" \
+  >&"$daemon_input"
+wait_for_event 'return to links after cursor activation' '"type":"title_changed"' '"title":"browser.nvim links"'
+wait_for_event 'cursor links return completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$links_page\""
+reset_events
+
 printf '%s\n' '{"type":"hints_start","browser_id":1}' >&"$daemon_input"
 wait_for_event 'hint mode start' '"type":"mode_changed"' '"mode":"hint"'
 wait_for_event 'four visible hint targets' '"type":"hints_ready"' '"count":4'
@@ -283,6 +296,22 @@ printf '%s\n' \
 wait_for_event 'explicit insert mode start' '"type":"mode_changed"' '"mode":"insert"'
 printf '%s\n' '{"type":"input_cancel","browser_id":1}' >&"$daemon_input"
 wait_for_event 'explicit insert mode cancellation' '"type":"mode_changed"' '"mode":"normal"'
+reset_events
+
+printf '%s\n' \
+  "{\"type\":\"navigate\",\"browser_id\":1,\"url\":\"file://$cursor_page\"}" \
+  >&"$daemon_input"
+wait_for_event 'cursor page title' '"type":"title_changed"' '"title":"browser.nvim cursor"'
+wait_for_event 'cursor page completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$cursor_page\""
+reset_events
+
+printf '%s\n' \
+  '{"type":"cursor_move","browser_id":1,"operation":"down"}' \
+  '{"type":"visual_cursor_start","browser_id":1}' \
+  >&"$daemon_input"
+wait_for_event 'visual mode after crossing blank space' '"type":"mode_changed"' '"mode":"visual"'
+printf '%s\n' '{"type":"visual_yank","browser_id":1}' >&"$daemon_input"
+wait_for_event 'stable cursor movement across blank space' '"type":"visual_yank"' '"text":"B"'
 reset_events
 
 printf '%s\n' \

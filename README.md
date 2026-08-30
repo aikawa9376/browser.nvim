@@ -120,27 +120,35 @@ The default Browser Normal Mode mappings are:
 | `b` / `w` | Move the DOM cursor by word |
 | `j` / `k` | Move to the previous / next visual line |
 | `0` / `$` | Move to the visual line start / end |
+| `<CR>` | Activate the link or button under the DOM cursor |
 | `<C-d>` / `<C-u>` | Scroll half a viewport |
 | `<C-f>` / `<C-b>` | Scroll one viewport |
 | `gg` / `G` | Top / bottom |
 | `H` / `L` | Back / forward |
 | `r` | Reload |
-| `o` | Open a URL |
+| `o` | Edit the current URL and navigate |
 | `f` | Start link hints |
 | `v` | Start Browser Visual Mode at the DOM cursor |
 | `i` | Enter Insert Mode when the DOM cursor is on an editable element |
 | `yy` | Yank the current URL |
 
 Browser Normal Mode keeps a block cursor on rendered page text. Editable form
-elements are cursor stops and use an outline instead of a text block; `i`
-focuses that element and enters both Browser and Neovim Insert Mode. Cursor
+elements are cursor stops and use a yellow outline instead of a text block;
+links and buttons use a cyan outline. Text uses a solid yellow overlay rather
+than terminal blending so the cursor remains visible on light and dark pages.
+`i` focuses that element and enters both Browser and Neovim Insert Mode. Cursor
 motion scrolls when necessary, and page scrolling relocates an off-screen
-cursor to visible content. `<C-w>` mappings are not overridden, so normal Neovim window
-movement remains available. Link hints use labels generated from `asdfghjkl`. Choosing an
-`input`, `textarea`, or `select` focuses it and enters Browser Insert Mode.
+cursor to visible content. `<C-w>` mappings are not overridden, so normal
+Neovim window movement remains available. Link hints use labels generated from
+`asdfghjkl`. Choosing an `input`, `textarea`, or `select` focuses it and enters
+Browser Insert Mode.
 Committed UTF-8 text and Enter, Backspace, Delete, Tab, Shift-Tab, arrows,
 Home, End, Ctrl-A, Ctrl-C, and Ctrl-V are forwarded to CEF. `Esc` returns to
 Browser Normal Mode.
+
+The `o` prompt is intentionally prefilled with the current page URL, making it
+possible to edit only its path or query. Use `<CR>` instead when the cursor is
+already on a link or button in the page.
 
 Browser Visual Mode starts at the Normal Mode cursor and uses a DOM `Range` for
 the actual page selection while also entering Neovim's native characterwise

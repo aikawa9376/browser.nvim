@@ -298,6 +298,8 @@ local function on_event(event)
     end
   elseif event.type == "cursor_input_unavailable" then
     util.notify("browser.nvim: cursor is not on an editable element", vim.log.levels.INFO)
+  elseif event.type == "cursor_activate_unavailable" then
+    util.notify("browser.nvim: cursor is not on an actionable element", vim.log.levels.INFO)
   elseif event.type == "error" then
     if state.mode ~= "normal" then
       set_mode(state, "normal")
@@ -590,6 +592,14 @@ function M.start_input(state)
     return false
   end
   return ipc.send({ type = "input_cursor_start", browser_id = state.browser_id })
+end
+
+function M.activate_cursor(state)
+  state = state or state_for_current()
+  if not state or state.mode ~= "normal" or not state.ready or state.loading then
+    return false
+  end
+  return ipc.send({ type = "cursor_activate", browser_id = state.browser_id })
 end
 
 function M.input_text(state, text)

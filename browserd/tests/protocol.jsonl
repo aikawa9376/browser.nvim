@@ -2,6 +2,7 @@
 {"type":"attach","browser_id":1,"cols":20,"rows":10,"full_frame":true}
 {"type":"navigate","browser_id":1,"url":"https://example.org/日本語"}
 {"type":"cursor_move","browser_id":1,"operation":"down"}
+{"type":"cursor_activate","browser_id":1}
 {"type":"visual_cursor_start","browser_id":1}
 {"type":"visual_move","browser_id":1,"operation":"next_word"}
 {"type":"visual_cancel","browser_id":1}

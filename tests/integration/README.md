@@ -27,7 +27,9 @@ or `all` before starting Neovim.
 9. Run `:bdelete` on the browser buffer. Both anchor and browser resources must
    disappear.
 10. Open `links.html`, press `f`, and activate both a link and a form target
-    without using a mouse. `Esc` must remove an unfinished hint overlay.
+    without using a mouse. Also move the Normal cursor onto a link and press
+    `<CR>`; it must navigate without opening the `o` URL prompt. `Esc` must
+    remove an unfinished hint overlay.
 11. On `forms.html`, move the Normal cursor onto the outlined input, press `i`,
     and verify that Neovim enters Insert mode. Enter Japanese and emoji text,
     use editing keys, and return to both Browser and Neovim Normal Mode with

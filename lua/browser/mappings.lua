@@ -171,6 +171,12 @@ function M.attach(bufnr, state)
     end
   end, "browser insert mode")
 
+  map(bufnr, "<CR>", function()
+    if state.mode == "normal" then
+      browser.activate_cursor(state)
+    end
+  end, "activate cursor target")
+
   map(bufnr, keys.open, function()
     if state.mode == "visual" then
       visual.swap(state)
