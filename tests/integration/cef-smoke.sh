@@ -311,6 +311,11 @@ wait_for_event 'cursor page title' '"type":"title_changed"' '"title":"browser.nv
 wait_for_event 'cursor page completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$cursor_page\""
 reset_events
 
+printf '%s\n' '{"type":"cursor_activate","browser_id":1}' >&"$daemon_input"
+wait_for_event 'empty cursor click dismisses backdrop' \
+  '"type":"title_changed"' '"title":"browser.nvim cursor:dismissed"'
+reset_events
+
 for ((step = 0; step < 50; step += 1)); do
   printf '%s\n' '{"type":"cursor_move","browser_id":1,"operation":"down"}' \
     >&"$daemon_input"

@@ -791,16 +791,32 @@
   };
 
   const activateCursor = () => {
-    const element = closestCursorElement(
+    const rect = cursorRectangle();
+    const actionable = closestCursorElement(
       "a[href],button,summary,[role='button'],[role='link']," +
       "input[type='button'],input[type='submit'],input[type='reset']",
       (candidate) => !candidate.matches(":disabled"),
     );
-    if (!(element instanceof HTMLElement) || element.matches(":disabled")) {
-      api.send({ kind: "cursor_activate_unavailable" });
+    if (actionable instanceof HTMLElement) {
+      actionable.click();
       return;
     }
-    element.click();
+    const x = Math.max(0, Math.min(innerWidth - 1,
+      Math.floor(rect.left + rect.width / 2)));
+    const y = Math.max(0, Math.min(innerHeight - 1,
+      Math.floor(rect.top + rect.height / 2)));
+    const target = document.elementFromPoint(x, y);
+    if (target instanceof HTMLElement) {
+      target.click();
+    } else if (target instanceof Element) {
+      target.dispatchEvent(new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      }));
+    }
   };
 
   const hintInput = (key) => {

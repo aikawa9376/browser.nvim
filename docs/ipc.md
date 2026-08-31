@@ -78,9 +78,10 @@ at the nearest rendered text position:
 {"type":"visual_cursor_start","browser_id":1}
 ```
 
-`cursor_activate` clicks the actionable ancestor under the cursor. Text links
-and buttons are activated when they overlap the spatial cell. If no actionable target exists,
-the daemon emits `cursor_activate_unavailable`.
+`cursor_activate` clicks a recognized actionable element overlapping the
+spatial cursor cell. Otherwise it clicks the topmost DOM element at the cell
+center, which supports advertisement close controls and backdrops that dismiss
+an overlay when their otherwise empty background is clicked.
 
 DOM Visual Mode then uses `visual_move`, `visual_yank`, and `visual_cancel`.
 Move operations are

@@ -2,6 +2,11 @@
 <html lang="en">
 <head><meta charset="utf-8"><title>browser.nvim cursor</title></head>
 <body>
+  <div id="backdrop" style="position:fixed;inset:0;z-index:1000"
+       onclick="document.title='browser.nvim cursor:dismissed';this.remove()">
+    <div style="margin:80px;padding:20px;background:white"
+         onclick="event.stopPropagation()">Overlay</div>
+  </div>
   <p>Top</p>
   <div style="height:900px" aria-hidden="true"></div>
   <p>Bottom</p>
