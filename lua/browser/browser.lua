@@ -169,7 +169,7 @@ local function on_buf_win_enter(bufnr)
     end
     if primary and primary ~= winid then
       vim.schedule(function()
-        buffer.reject_duplicate(winid)
+        buffer.reject_duplicate(winid, bufnr)
       end)
       return
     end
@@ -443,7 +443,7 @@ function M.setup()
         local windows = buffer.windows(state.bufnr)
         if #windows > 1 and state.winid and state.winid ~= winid then
           vim.schedule(function()
-            buffer.reject_duplicate(winid)
+            buffer.reject_duplicate(winid, state.bufnr)
           end)
           return
         end

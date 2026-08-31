@@ -185,10 +185,24 @@ assert(count_messages("attach") >= 2, "buffer re-entry must reattach")
 local windows_before = #buffer.windows(state.bufnr)
 assert_equal(windows_before, 1, "browser must start in one window")
 vim.cmd("vsplit")
+local duplicate_win = vim.api.nvim_get_current_win()
+vim.api.nvim_win_set_buf(duplicate_win, other)
+vim.wait(150)
+assert_equal(
+  vim.api.nvim_win_get_buf(duplicate_win),
+  other,
+  "a stale duplicate rejection must not replace a newer buffer"
+)
+vim.api.nvim_win_set_buf(duplicate_win, state.bufnr)
 vim.wait(150, function()
   return #buffer.windows(state.bufnr) == 1
 end)
 assert_equal(#buffer.windows(state.bufnr), 1, "duplicate browser window must be rejected")
+assert_equal(
+  vim.api.nvim_get_option_value("filetype", { buf = vim.api.nvim_win_get_buf(duplicate_win) }),
+  "browser-error",
+  "an active duplicate browser window must show the error buffer"
+)
 if #vim.api.nvim_tabpage_list_wins(0) > 1 then
   vim.cmd("close")
 end

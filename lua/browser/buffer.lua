@@ -172,8 +172,10 @@ function M.restore_anchor(bufnr, state)
   end
 end
 
-function M.reject_duplicate(winid)
-  if not vim.api.nvim_win_is_valid(winid) then
+function M.reject_duplicate(winid, browser_bufnr)
+  if not vim.api.nvim_win_is_valid(winid)
+    or vim.api.nvim_win_get_buf(winid) ~= browser_bufnr
+  then
     return
   end
   local error_buf = vim.api.nvim_create_buf(false, true)
