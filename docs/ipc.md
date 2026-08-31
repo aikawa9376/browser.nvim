@@ -142,6 +142,9 @@ and with `ready=true` only after the new renderer context has installed the
 browser bridge, cursor, hint, and Visual Mode scripts. UI clients gate DOM
 commands on this event rather than the broader `loading` event; subresources
 and advertising frames may keep loading after the main document is interactive.
+When back/forward cache restores an existing renderer context, browserd asks
+that context to repeat the handshake after navigation finishes. History-command
+serialization therefore follows CEF navigation loading, not DOM readiness.
 
 `created`, `destroyed`, `url_changed`, `title_changed`, `loading`, `page_ready`,
 `mode_changed`, hint/visual results, and `error` events include a `browser_id`

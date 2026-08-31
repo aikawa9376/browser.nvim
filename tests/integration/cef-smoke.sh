@@ -157,11 +157,17 @@ reset_events
 printf '%s\n' '{"type":"back","browser_id":1}' >&"$daemon_input"
 wait_for_event 'back navigation' '"type":"title_changed"' '"title":"browser.nvim scroll:top:0"'
 wait_for_event 'back completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$scroll_page\""
+wait_for_event 'back page readiness' '"type":"page_ready"' '"ready":true'
+printf '%s\n' '{"type":"visual_cursor_start","browser_id":1}' >&"$daemon_input"
+wait_for_event 'cursor works after back' '"type":"mode_changed"' '"mode":"visual"'
+printf '%s\n' '{"type":"visual_cancel","browser_id":1}' >&"$daemon_input"
+wait_for_event 'normal mode after back cursor check' '"type":"mode_changed"' '"mode":"normal"'
 reset_events
 
 printf '%s\n' '{"type":"forward","browser_id":1}' >&"$daemon_input"
 wait_for_event 'forward navigation' '"type":"title_changed"' '"title":"browser.nvim basic"'
 wait_for_event 'forward completion' '"type":"loading"' '"loading":false' "\"url\":\"file://$page\""
+wait_for_event 'forward page readiness' '"type":"page_ready"' '"ready":true'
 reset_events
 
 printf '%s\n' '{"type":"reload","browser_id":1}' >&"$daemon_input"

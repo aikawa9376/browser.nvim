@@ -426,6 +426,7 @@ bool CefBrowserManager::Navigate(std::uint32_t browser_id,
   }
   if (state->browser) {
     SetPageReady(state, false);
+    state->loading = true;
     state->browser->GetMainFrame()->LoadURL(state->url);
   }
   return true;
@@ -448,7 +449,7 @@ bool CefBrowserManager::NavigationCommand(std::uint32_t browser_id,
     }
     return false;
   }
-  if (!state->browser || (!state->page_ready && command != "stop")) {
+  if (!state->browser || (state->loading && command != "stop")) {
     state->pending_navigation_commands.emplace_back(command);
     return true;
   }
@@ -991,16 +992,6 @@ bool CefBrowserManager::HandleBridgeQuery(std::uint32_t browser_id,
   }
   if (*kind == "page_ready") {
     SetPageReady(state, true);
-    while (!state->pending_navigation_commands.empty()) {
-      std::string command =
-          std::move(state->pending_navigation_commands.front());
-      state->pending_navigation_commands.erase(
-          state->pending_navigation_commands.begin());
-      ExecuteNavigationCommand(state, command);
-      if (!state->page_ready) {
-        break;
-      }
-    }
     if (state->page_ready) {
       std::vector<std::string> scripts = std::move(state->pending_scripts);
       state->pending_scripts.clear();
@@ -1356,6 +1347,7 @@ void CefBrowserManager::OnLoadingStateChange(std::uint32_t browser_id,
   }
   state->can_go_back = can_go_back;
   state->can_go_forward = can_go_forward;
+  state->loading = loading;
   JsonValue::Object event = Event("loading", browser_id);
   event.emplace("loading", JsonValue(loading));
   event.emplace("can_go_back", JsonValue(can_go_back));
@@ -1369,9 +1361,12 @@ void CefBrowserManager::OnLoadingStateChange(std::uint32_t browser_id,
       state->pending_navigation_commands.erase(
           state->pending_navigation_commands.begin());
       ExecuteNavigationCommand(state, command);
-      if (!state->page_ready) {
+      if (state->loading) {
         return;
       }
+    }
+    if (!state->page_ready) {
+      RequestPageReadyHandshake(state);
     }
   }
 }
@@ -1382,6 +1377,7 @@ void CefBrowserManager::OnMainFrameNavigationStarted(
   if (!state || state->destroying) {
     return;
   }
+  state->loading = true;
   SetPageReady(state, false);
   if (state->mode != "normal") {
     SetMode(state, "normal");
@@ -1396,19 +1392,33 @@ void CefBrowserManager::ExecuteNavigationCommand(CefBrowserState* state,
   if (command == "back") {
     if (state->browser->CanGoBack()) {
       SetPageReady(state, false);
+      state->loading = true;
       state->browser->GoBack();
     }
   } else if (command == "forward") {
     if (state->browser->CanGoForward()) {
       SetPageReady(state, false);
+      state->loading = true;
       state->browser->GoForward();
     }
   } else if (command == "reload") {
     SetPageReady(state, false);
+    state->loading = true;
     state->browser->Reload();
   } else if (command == "stop") {
     state->browser->StopLoad();
   }
+}
+
+void CefBrowserManager::RequestPageReadyHandshake(CefBrowserState* state) {
+  if (!state || !state->browser) {
+    return;
+  }
+  CefRefPtr<CefFrame> frame = state->browser->GetMainFrame();
+  frame->ExecuteJavaScript(
+      "window.__nvimBrowser&&window.__nvimBrowser.visual&&"
+      "window.__nvimBrowser.send({kind:'page_ready'});",
+      frame->GetURL(), 0);
 }
 
 void CefBrowserManager::ExecuteScript(CefBrowserState* state,

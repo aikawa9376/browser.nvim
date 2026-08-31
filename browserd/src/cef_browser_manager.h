@@ -44,6 +44,7 @@ struct CefBrowserState {
   bool visible = true;
   bool focused = false;
   bool destroying = false;
+  bool loading = false;
   bool page_ready = false;
   bool can_go_back = false;
   bool can_go_forward = false;
@@ -167,6 +168,7 @@ class CefBrowserManager {
   bool CleanupKitty(CefBrowserState* state, std::string* error);
   void ExecuteNavigationCommand(CefBrowserState* state,
                                 std::string_view command);
+  static void RequestPageReadyHandshake(CefBrowserState* state);
   static void ExecuteScript(CefBrowserState* state, std::string script);
   void SetPageReady(CefBrowserState* state, bool ready);
   void SetMode(CefBrowserState* state, std::string mode);
